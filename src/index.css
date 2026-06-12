@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;650;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
+  
+  --color-zinc-950: #09090b;
+  --color-zinc-900: #18181b;
+  --color-zinc-800: #27272a;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-450: #71717a;
+  --color-zinc-400: #a1a1aa;
+}
+
+body {
+  background-color: #09090b;
+  color: #fafafa;
+  font-family: var(--font-sans);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scaleUp {
+  animation: scaleUp 0.2s ease-out forwards;
+}
+
+@media print {
+  /* Hide all background container controls */
+  body * {
+    visibility: hidden !important;
+  }
+  
+  /* Show only our exact print area */
+  #invoice-print-area, #invoice-print-area * {
+    visibility: visible !important;
+  }
+  
+  /* Reset page sizing precisely for A5 portrait prints */
+  @page {
+    size: A5 portrait;
+    margin: 0;
+  }
+  
+  #invoice-print-area {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 148mm !important;
+    height: 210mm !important;
+    padding: 10mm !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    background-color: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body {
+    background-color: white !important;
+    background-image: none !important;
+    color: black !important;
+  }
+}

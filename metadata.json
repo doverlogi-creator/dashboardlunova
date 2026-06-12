@@ -1,0 +1,6 @@
+{
+  "name": "Dashboard Usaha Lighting - 2026",
+  "description": "Dashboard interaktif untuk mengelola dan menganalisis data pemasukan, pengeluaran, dan bagi hasil usaha lighting dekorasi / wedding event berdasarkan Google Sheets melalui Google Apps Script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
