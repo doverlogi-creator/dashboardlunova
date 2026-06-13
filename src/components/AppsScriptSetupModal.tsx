@@ -120,21 +120,16 @@ function doGet(e) {
   }
   
   // Ambil parameter pengeluaran dari Kolom H & I
-  // Dan nilai "Pengadaan Saat Ini" diambil secara real-time dari sheet "Summary" sel L9 saja
-  var summarySheet = ss.getSheetByName("Summary") || ss.getSheetByName("summary") || ss.getSheetByName("SUMMARY") || ss.getSheetByName("Summary Sheet") || ss.getSheetByName("summary sheet");
-  var pengadaanVal = 0;
-  if (summarySheet) {
-    pengadaanVal = parseRupiahValue(summarySheet.getRange("L9").getValue());
-  }
+  var pengadaanVal = parseRupiahValue(sheet.getRange("I7").getValue());
   if (!pengadaanVal) {
     pengadaanVal = 7208099;
   }
   
   var settings = {
-    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()) || 300000,
-    cashback: parseRupiahValue(sheet.getRange("I3").getValue()) || 100000,
-    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()) || 250000,
-    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()) || 25000,
+    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()),
+    cashback: parseRupiahValue(sheet.getRange("I3").getValue()),
+    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()),
+    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()),
     pengadaanKeseluruhanKeluar: pengadaanVal,
     partner1Name: "Lunova Lighting",
     partner1Share: 40,
@@ -159,6 +154,70 @@ function doPost(e) {
   
   try {
     var params = JSON.parse(e.postData.contents);
+    
+    // Handler khusus untuk sinkronisasi nilai parameter biaya/settings
+    if (params.action === "updateSettings") {
+      var sheet = ss.getSheetByName("Raw_Data") || ss.getSheetByName("raw_data") || ss.getSheetByName("raw data") || ss.getSheetByName("Raw Data") || ss.getSheetByName("Pengisian data") || ss.getSheets()[0];
+      if (!sheet) {
+        return createJsonResponse({ success: false, error: "Sheet tidak ditemukan!" });
+      }
+      
+      var s = params.settings;
+      if (s) {
+        // Baris 2: Operasional / acara di H2, nilainya di I2
+        sheet.getRange("H2").setValue("Operasional / acara");
+        if (s.operasionalAcara !== undefined) sheet.getRange("I2").setValue(Number(s.operasionalAcara));
+        
+        // Baris 3: Cashback di H3, nilainya di I3
+        sheet.getRange("H3").setValue("Cashback");
+        if (s.cashback !== undefined) sheet.getRange("I3").setValue(Number(s.cashback));
+        
+        // Baris 5: Karyawan / acara di H5, nilainya di I5
+        sheet.getRange("H5").setValue("Karyawan / acara");
+        if (s.karyawanAcara !== undefined) sheet.getRange("I5").setValue(Number(s.karyawanAcara));
+        
+        // Baris 6: Bensin / acara di H6, nilainya di I6
+        sheet.getRange("H6").setValue("Bensin / acara");
+        if (s.bensinAcara !== undefined) sheet.getRange("I6").setValue(Number(s.bensinAcara));
+        
+        // Baris 7: Pengadaan Keseluruhan Keluar di H7, nilainya di I7
+        sheet.getRange("H7").setValue("Pengadaan Keseluruhan Keluar");
+        if (s.pengadaanKeseluruhanKeluar !== undefined) sheet.getRange("I7").setValue(Number(s.pengadaanKeseluruhanKeluar));
+        
+        return createJsonResponse({ success: true, message: "Pengaturan berhasil diperbarui di Google Sheets!" });
+      }
+      return createJsonResponse({ success: false, error: "Payload settings kosong!" });
+    }
+    
+    // Handler khusus untuk menghapus data event dari Google Sheets
+    if (params.action === "deleteEvent") {
+      var eventId = params.id;
+      if (eventId && eventId.indexOf("evt-") === 0) {
+        var rowIdx = parseInt(eventId.replace("evt-", ""), 10);
+        if (rowIdx > 0) {
+          // values[i] -> row indices are i + 1. So row to delete is rowIdx + 1.
+          var deleted = false;
+          if (rawDataSheet && rowIdx + 1 <= rawDataSheet.getLastRow()) {
+            rawDataSheet.deleteRow(rowIdx + 1);
+            deleted = true;
+          }
+          if (pengisianSheet && rowIdx + 1 <= pengisianSheet.getLastRow()) {
+            pengisianSheet.deleteRow(rowIdx + 1);
+            deleted = true;
+          }
+          // Fallback if sheet names are different
+          if (!deleted && ss.getSheets().length > 0) {
+            var firstSheet = ss.getSheets()[0];
+            if (rowIdx + 1 <= firstSheet.getLastRow()) {
+              firstSheet.deleteRow(rowIdx + 1);
+            }
+          }
+          return createJsonResponse({ success: true, message: "Data berhasil dihapus dari Google Sheets!" });
+        }
+      }
+      return createJsonResponse({ success: false, error: "ID transaksi tidak valid untuk dihapus." });
+    }
+    
     var inputDate = params.tanggal ? new Date(params.tanggal) : new Date();
     
     var jenisPaket = params.jenisPaket || "";
@@ -336,18 +395,18 @@ function createJsonResponse(data) {
                 <li>
                   <p className="font-medium text-zinc-200">Siapkan Spreadsheet Anda</p>
                   <p className="text-zinc-400 mt-0.5">
-                    Pastikan spreadsheet Anda memiliki sheet bernama <strong className="text-blue-400">"raw data"</strong> (atau <strong className="text-blue-400">"Pengisian data"</strong>) dengan layout kolom persis seperti di gambar: kolom A: Tanggal, B: Jenis Paket, C: Vendor/WO, D: Lokasi, E: No. Handphone / WA, F: Pemasukan/Event (seluruh pemasukan pada Daftar Transaksi Pengisian Data dicatat di sheet raw data pada kolom F tersebut).
+                    Pastikan spreadsheet Anda memiliki sheet bernama <strong className="text-blue-400">"Raw_Data"</strong> (atau <strong className="text-blue-400">"raw data"</strong>) dengan layout kolom persis seperti di gambar: kolom A: Tanggal, B: Jenis Paket, C: Vendor/WO, D: Lokasi, E: No. Handphone / WA, F: Pemasukan/Event (seluruh pemasukan pada Daftar Transaksi Pengisian Data dicatat di sheet raw data pada kolom F tersebut).
                   </p>
                 </li>
                 <li>
                   <p className="font-medium text-zinc-200">Lokasi Setting Operasional & Pengadaan</p>
                   <p className="text-zinc-400 mt-0.5 font-sans leading-relaxed">
-                    Buat pengaturan variabel di kolom <strong className="text-zinc-200">H & I</strong> pada sheet <strong className="text-blue-400">"raw data"</strong> (atau <strong className="text-blue-400">"Pengisian data"</strong>):<br />
+                    Buat pengaturan variabel di kolom <strong className="text-zinc-200">H & I</strong> pada sheet <strong className="text-blue-400">"Raw_Data"</strong> (dan biarkan sheet <strong className="text-emerald-450">"Pengisian data"</strong> hanya berisi Table 1 tanpa terganggu):<br />
                     - Baris 2: <code className="text-blue-400">Operasional / acara</code> di H2, nilainya di I2 (e.g. <code className="text-zinc-300">300000</code>)<br />
                     - Baris 3: <code className="text-blue-400">Cashback</code> di H3, nilainya di I3 (e.g. <code className="text-zinc-300">100000</code>)<br />
                     - Baris 5: <code className="text-blue-400">Karyawan / acara</code> di H5, nilainya di I5 (e.g. <code className="text-zinc-300">250000</code>)<br />
                     - Baris 6: <code className="text-blue-400">Bensin / acara</code> di H6, nilainya di I6 (e.g. <code className="text-zinc-300">25000</code>)<br />
-                    - Pengadaan Saat Ini: Nilai dibaca real-time dari sheet <strong className="text-blue-400">"Summary"</strong> pada sel <strong className="text-amber-400">L9 saja</strong> (e.g. <code className="text-zinc-300">Rp6.738.099,00</code>).<br />
+                    - Baris 7: <code className="text-blue-400">Pengadaan Keseluruhan Keluar</code> di H7, nilainya di I7 (e.g. <code className="text-zinc-300">7208099</code>)<br />
                     - Total Keuntungan Bersih: Nilai diatur dan dihitung secara organik real-time berdasarkan akumulasi total dari tiap rincian transaksi persewaan yang ada.<br />
                   </p>
                 </li>

@@ -273,7 +273,7 @@ export const DEFAULT_SETTINGS: CostSettings = {
   cashback: 100000,
   karyawanAcara: 250000,
   bensinAcara: 25000,
-  pengadaanKeseluruhanKeluar: 7208099, // default disesuaikan dengan Summary L9
+  pengadaanKeseluruhanKeluar: 7208099, // default disesuaikan dengan Column I7 (Baris 7)
   
   partner1Name: "Lunova Lighting",
   partner1Share: 40,

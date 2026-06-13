@@ -28,7 +28,11 @@ import {
   Wallet,
   Wifi,
   WifiOff,
-  Zap
+  Zap,
+  LayoutDashboard,
+  Settings,
+  Menu,
+  X
 } from "lucide-react";
 
 import { EventData, CostSettings, AppsScriptConfig } from "./types";
@@ -42,7 +46,8 @@ import InvoiceGenerator from "./components/InvoiceGenerator";
 
 export default function App() {
   // --- STATES ---
-  const [activeView, setActiveView] = useState<"dashboard" | "invoice">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "invoice" | "settings">("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [events, setEvents] = useState<EventData[]>([]);
   const [settings, setSettings] = useState<CostSettings>(DEFAULT_SETTINGS);
   const [appsScriptConfig, setAppsScriptConfig] = useState<AppsScriptConfig>({
@@ -52,6 +57,7 @@ export default function App() {
   });
 
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
+  const [isCostModalOpen, setIsCostModalOpen] = useState(false);
   const [isSetupGasOpen, setIsSetupGasOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -91,38 +97,28 @@ export default function App() {
       localStorage.setItem("lighting_events_2026", JSON.stringify(MOCK_EVENTS));
     }
 
-    // 2. Load Settings
+    // 2. Load Settings - Try to read from localStorage if present, otherwise use DEFAULT_SETTINGS
     const storedSettings = localStorage.getItem("lighting_settings_2026");
     if (storedSettings) {
       try {
-        const parsed = JSON.parse(storedSettings);
-        let updated = false;
-        if (parsed.partner1Name === "Neovan") {
-          parsed.partner1Name = "Lunova Lighting";
-          updated = true;
-        }
-        // Auto migrate old settings values representing procurement cost to the new default (7.208.099)
-        if (parsed.pengadaanKeseluruhanKeluar === 340000 || parsed.pengadaanKeseluruhanKeluar === 340051 || parsed.pengadaanKeseluruhanKeluar === 6738099) {
-          parsed.pengadaanKeseluruhanKeluar = 7208099;
-          updated = true;
-        }
-        if (updated) {
-          localStorage.setItem("lighting_settings_2026", JSON.stringify(parsed));
-        }
-        setSettings(parsed);
+        setSettings(JSON.parse(storedSettings));
       } catch (e) {
         setSettings(DEFAULT_SETTINGS);
       }
     } else {
       setSettings(DEFAULT_SETTINGS);
-      localStorage.setItem("lighting_settings_2026", JSON.stringify(DEFAULT_SETTINGS));
     }
 
     // 3. Load Apps Script Config
     const storedGasConfig = localStorage.getItem("lighting_gas_config_2026");
     if (storedGasConfig) {
       try {
-        setAppsScriptConfig(JSON.parse(storedGasConfig));
+        const parsedGasConfig = JSON.parse(storedGasConfig);
+        setAppsScriptConfig(parsedGasConfig);
+        if (!parsedGasConfig.isDemoMode && parsedGasConfig.webAppUrl) {
+          // Immediately sync with Google Sheets on mount to ensure fresh data
+          setTimeout(() => handleSyncData(parsedGasConfig.webAppUrl), 500);
+        }
       } catch (e) {
         // use default
       }
@@ -174,7 +170,7 @@ export default function App() {
     setSyncError(null);
     try {
       const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 12000); // 12 seconds timeout
+      const id = setTimeout(() => controller.abort(), 25000); // 25 seconds timeout to allow slow/cold sheets to respond
 
       const res = await fetch(targetUrl, { signal: controller.signal });
       clearTimeout(id);
@@ -188,19 +184,18 @@ export default function App() {
         // Save events retrieved from sheet
         saveEventsLocally(rawJson.data);
 
-        // Save settings retrieved from sheet if present, or maintain current
+        // Save settings retrieved from sheet if present and make Google Sheets the absolute sole source of truth with fallback to current state if empty
         if (rawJson.settings) {
-          const syncedPengadaan = Number(rawJson.settings.pengadaanKeseluruhanKeluar) || settings.pengadaanKeseluruhanKeluar;
           const mergedSettings: CostSettings = {
-            operasionalAcara: Number(rawJson.settings.operasionalAcara) || settings.operasionalAcara,
-            cashback: Number(rawJson.settings.cashback) || settings.cashback,
-            karyawanAcara: Number(rawJson.settings.karyawanAcara) || settings.karyawanAcara,
-            bensinAcara: Number(rawJson.settings.bensinAcara) || settings.bensinAcara,
-            pengadaanKeseluruhanKeluar: syncedPengadaan,
-            partner1Name: rawJson.settings.partner1Name || settings.partner1Name,
-            partner1Share: Number(rawJson.settings.partner1Share) || settings.partner1Share,
-            partner2Name: rawJson.settings.partner2Name || settings.partner2Name,
-            partner2Share: Number(rawJson.settings.partner2Share) || settings.partner2Share,
+            operasionalAcara: Number(rawJson.settings.operasionalAcara) || settings.operasionalAcara || DEFAULT_SETTINGS.operasionalAcara,
+            cashback: Number(rawJson.settings.cashback) || settings.cashback || DEFAULT_SETTINGS.cashback,
+            karyawanAcara: Number(rawJson.settings.karyawanAcara) || settings.karyawanAcara || DEFAULT_SETTINGS.karyawanAcara,
+            bensinAcara: Number(rawJson.settings.bensinAcara) || settings.bensinAcara || DEFAULT_SETTINGS.bensinAcara,
+            pengadaanKeseluruhanKeluar: Number(rawJson.settings.pengadaanKeseluruhanKeluar) || settings.pengadaanKeseluruhanKeluar || DEFAULT_SETTINGS.pengadaanKeseluruhanKeluar,
+            partner1Name: rawJson.settings.partner1Name || settings.partner1Name || DEFAULT_SETTINGS.partner1Name,
+            partner1Share: Number(rawJson.settings.partner1Share) || settings.partner1Share || DEFAULT_SETTINGS.partner1Share,
+            partner2Name: rawJson.settings.partner2Name || settings.partner2Name || DEFAULT_SETTINGS.partner2Name,
+            partner2Share: Number(rawJson.settings.partner2Share) || settings.partner2Share || DEFAULT_SETTINGS.partner2Share,
           };
           saveSettingsLocally(mergedSettings);
         }
@@ -215,7 +210,21 @@ export default function App() {
       }
     } catch (err: any) {
       console.error(err);
-      setSyncError(err.message || "Gagal menghubungi Google Apps Script. Cek jaringan atau perizinan webapp Anda.");
+      if (err.name === "AbortError" || err.message?.includes("abort")) {
+        console.warn("Koneksi ke Google Sheets dibatalkan (timeout/user abort). Menggunakan cache lokal.");
+      } else {
+        setSyncError(err.message || "Gagal menghubungi Google Apps Script. Cek jaringan atau perizinan webapp Anda.");
+      }
+      // Cache Cadangan: If sync fails, load backup settings from localStorage
+      const storedSettings = localStorage.getItem("lighting_settings_2026");
+      if (storedSettings) {
+        try {
+          const parsed = JSON.parse(storedSettings);
+          setSettings(parsed);
+        } catch (e) {
+          // ignore
+        }
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -225,7 +234,7 @@ export default function App() {
   const handleTestConnection = async (testUrl: string) => {
     try {
       const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 8000); // 8 sec timeout
+      const id = setTimeout(() => controller.abort(), 15000); // 15 sec timeout for test connection
       
       const res = await fetch(testUrl, { signal: controller.signal });
       clearTimeout(id);
@@ -241,6 +250,9 @@ export default function App() {
         return { success: false, message: "Response sukses tapi format data tidak cocok (harus mengembalikan JSON data: [])" };
       }
     } catch (e: any) {
+      if (e.name === "AbortError" || e.message?.includes("abort")) {
+        return { success: false, message: "Koneksi timeout. Google Sheets/Apps Script lambat merespons (silakan coba hubungkan kembali)." };
+      }
       return { success: false, message: e.message || "Kesalahan jaringan. Pastikan URL benar." };
     }
   };
@@ -291,9 +303,81 @@ export default function App() {
   };
 
   // --- DELETE TRANSAKSI ---
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
+    // Terapkan perubahan lokal langsung terlebih dahulu agar UI responsif seketika
     const updated = events.filter((e) => e.id !== id);
     saveEventsLocally(updated);
+
+    if (!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
+      try {
+        setIsSyncing(true);
+        setSyncError(null);
+        await fetch(appsScriptConfig.webAppUrl, {
+          method: "POST",
+          mode: "no-cors", // Hindari pemblokiran preflight CORS oleh Apps Script Redirect
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "deleteEvent",
+            id: id,
+          }),
+        });
+
+        // Tarik data terbaru setelah penghapusan berhasil agar tabel tersinkronisasi murni
+        setTimeout(() => handleSyncData(), 1200);
+      } catch (err: any) {
+        console.error("Gagal menghapus baris dari Google Sheet:", err);
+        setSyncError("Gagal menghapus data dari Google Sheet. Data dihapus lokal saja.");
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  // --- SYNC SETTINGS TO GOOGLE SHEETS ---
+  const handleUpdateSettingsOnSheet = async (updatedSettings?: CostSettings) => {
+    let settingsToSync = updatedSettings;
+    if (!settingsToSync) {
+      const stored = localStorage.getItem("lighting_settings_2026");
+      if (stored) {
+        try {
+          settingsToSync = JSON.parse(stored);
+        } catch (e) {
+          settingsToSync = settings;
+        }
+      } else {
+        settingsToSync = settings;
+      }
+    }
+
+    if (!settingsToSync) return;
+
+    if (!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
+      try {
+        setIsSyncing(true);
+        setSyncError(null);
+        await fetch(appsScriptConfig.webAppUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "updateSettings",
+            settings: settingsToSync,
+          }),
+        });
+        
+        // Trigger background sync to refresh state
+        setTimeout(() => handleSyncData(), 1200);
+      } catch (err: any) {
+        console.error("Gagal update parameter biaya ke Google Sheet:", err);
+        setSyncError("Gagal memperbarui parameter biaya di Google Sheets.");
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   // Save Apps Script settings from Dialog
@@ -336,121 +420,165 @@ export default function App() {
   const totals = getDashboardTotals(events, settings);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-blue-500/20 selection:text-blue-200 pb-20 font-sans">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-blue-500/20 selection:text-blue-200 flex flex-col relative w-full overflow-x-hidden">
       {/* Decorative Neon Lighting glow accents */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[300px] bg-purple-950/10 rounded-full blur-[150px] pointer-events-none" />
       <div className="absolute top-10 right-1/4 w-[400px] h-[300px] bg-blue-950/10 rounded-full blur-[150px] pointer-events-none" />
 
-      {/* Main Single-View Wrapper */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6 relative z-10">
-        
-        {/* Connection Bar Header */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-blue-500">
-              <Database className="w-5 h-5 animate-pulse" />
-            </span>
-            <div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block font-mono">
-                Sumber Database
-              </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${appsScriptConfig.isDemoMode ? "bg-purple-550 animate-pulse" : "bg-blue-500"}`} />
-                <span className="text-xs font-semibold text-zinc-200">
-                  {appsScriptConfig.isDemoMode ? "Mode Simulasi (Demo Offline)" : "Mode Live (Google Sheets Terhubung)"}
-                </span>
-                {appsScriptConfig.lastSyncedAt && (
-                  <span className="text-[10px] font-mono text-zinc-500 hidden sm:inline">
-                    • Terakhir Sinkron: {new Date(appsScriptConfig.lastSyncedAt).toLocaleTimeString("id-ID")}
-                  </span>
-                )}
-              </div>
+      {/* GLOBAL HEADER BAR (DESKTOP & MOBILE) */}
+      <div className="flex items-center justify-between p-4 bg-zinc-900 border-b border-zinc-800 z-40 sticky top-0 w-full shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg outline-none transition-all cursor-pointer flex items-center justify-center border border-zinc-800/80 bg-zinc-950/40"
+            title="Menu"
+          >
+            {isSidebarOpen ? <X className="w-5 h-5 text-blue-500 animate-pulse" /> : <Menu className="w-5 h-5 text-blue-500" />}
+          </button>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+              <Zap className="w-5 h-5 fill-white/10 text-white" />
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {appsScriptConfig.webAppUrl && (
-              <button
-                onClick={handleToggleDemoMode}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                  appsScriptConfig.isDemoMode
-                    ? "bg-blue-500/10 text-blue-500 border-blue-500/25 hover:bg-blue-550/20"
-                    : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white"
-                }`}
-              >
-                {appsScriptConfig.isDemoMode ? "Aktifkan Live Sheet" : "Masuk Mode Simulasi"}
-              </button>
-            )}
-
-            {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl && (
-              <button
-                onClick={() => handleSyncData()}
-                disabled={isSyncing}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 disabled:opacity-50 text-blue-400 border border-zinc-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                <span>{isSyncing ? "Menyelaras..." : "Gores Sinkron"}</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setIsSetupGasOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer"
-            >
-              <CloudLightning className="w-3.5 h-3.5 text-white" />
-              <span>{appsScriptConfig.webAppUrl ? "Ubah Koneksi Sheet" : "Hubungkan Google Sheet"}</span>
-            </button>
+            <span className="font-extrabold text-sm tracking-tight text-white">
+              Lunova <span className="text-blue-500 font-bold">Lighting</span>
+            </span>
           </div>
         </div>
 
-        {/* PAGE NAVIGATION TABS */}
-        <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl gap-1">
+        {/* Database Status Alert */}
+        <div className="flex items-center gap-2 bg-zinc-950/50 border border-zinc-800 px-3 py-1.5 rounded-xl">
+          <span className={`w-2 h-2 rounded-full ${appsScriptConfig.isDemoMode ? "bg-purple-500 animate-pulse" : "bg-blue-500"}`} />
+          <span className="text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
+            {appsScriptConfig.isDemoMode ? "Mode Simulasi" : "Sheets Terhubung"}
+          </span>
+        </div>
+      </div>
+
+      {/* SIDEBAR OVERLAY BACKDROP */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* SIDEBAR PANEL */}
+      <aside className={`
+        fixed inset-y-0 left-0 w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col z-40 
+        transition-transform duration-300 h-screen shrink-0
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      `}>
+        {/* Logo / Brand header with Close Button */}
+        <div className="p-6 border-b border-zinc-800/60 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 shrink-0">
+              <Zap className="w-5 h-5 fill-white/10 text-white" />
+            </div>
+            <div>
+              <span className="font-extrabold text-sm tracking-tight text-white block">
+                Lunova <span className="text-blue-500 font-bold">Lighting</span>
+              </span>
+              <span className="text-[9px] text-zinc-500 font-mono tracking-widest block uppercase -mt-0.5">
+                Partner Portal
+              </span>
+            </div>
+          </div>
           <button
-            onClick={() => setActiveView("dashboard")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all cursor-pointer"
+            title="Tutup Menu"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Navigation Section */}
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+          <button
+            onClick={() => {
+              setActiveView("dashboard");
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 cursor-pointer ${
               activeView === "dashboard"
                 ? "bg-blue-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
-            <Activity className="w-4 h-4" />
-            <span>📊 Dashboard & Analisis Event</span>
+            <LayoutDashboard className="w-4 h-4 shrink-0" />
+            <span>📊 Dashboard Analisis</span>
           </button>
-          
+
           <button
             onClick={() => {
               setActiveView("invoice");
-              // Smooth scroll to top when switching
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setIsSidebarOpen(false);
+              window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 cursor-pointer ${
               activeView === "invoice"
                 ? "bg-emerald-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
-            <FileText className="w-4 h-4" />
-            <span>🧾 Halaman Transaksi & Buat Invoice (A5)</span>
+            <FileText className="w-4 h-4 shrink-0" />
+            <span>🧾 Transaksi & Invoice</span>
           </button>
-        </div>
 
+          <button
+            onClick={() => {
+              setActiveView("settings");
+              setIsSidebarOpen(false);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 cursor-pointer ${
+              activeView === "settings"
+                ? "bg-zinc-850 text-blue-400 border border-zinc-700/50"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent"
+            }`}
+          >
+            <Settings className="w-4 h-4 shrink-0" />
+            <span>⚙️ Pengaturan & Database</span>
+          </button>
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-zinc-800/60 bg-zinc-900/40">
+          <div className="flex items-center gap-2.5">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${appsScriptConfig.isDemoMode ? "bg-purple-550 animate-pulse" : "bg-blue-500"}`} />
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block font-mono">
+                Status Database
+              </span>
+              <span className="text-[11px] font-semibold text-zinc-300 block truncate font-mono">
+                {appsScriptConfig.isDemoMode ? "Demo Mode" : "Google Sheets"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN VIEWPORT */}
+      <main className="flex-1 min-w-0 relative z-10 px-4 sm:px-6 lg:px-8 py-8 md:py-10 space-y-6">
+        
         {/* Sync / Connection error alert */}
         {syncError && (
           <div className="bg-red-950/20 border border-red-900/40 p-4 rounded-xl text-red-400 text-xs flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping sink-0" />
               <span><strong>Kesalahan Sinkronisasi:</strong> {syncError}</span>
             </div>
             <button
               onClick={() => setSyncError(null)}
-              className="font-bold text-neutral-500 hover:text-neutral-300 px-2 py-1 text-sm outline-none"
+              className="font-bold text-neutral-500 hover:text-neutral-300 px-2 py-1 text-sm outline-none shrink-0"
             >
               ×
             </button>
           </div>
         )}
 
-        {activeView === "dashboard" ? (
+        {/* VIEW CONDITIONAL RENDERING */}
+        {activeView === "dashboard" && (
           <>
             {/* App Title Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
@@ -470,151 +598,24 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
                 <button
-                  onClick={() => setShowSettingsPanel(!showSettingsPanel)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all cursor-pointer ${
-                    showSettingsPanel
-                      ? "bg-zinc-800 text-white border-zinc-700"
-                      : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:text-white"
-                  }`}
+                  onClick={() => setIsCostModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-900 text-zinc-300 border border-zinc-800 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
                 >
                   <Sliders className="w-4 h-4" />
-                  <span>{showSettingsPanel ? "Sembunyikan Pengaturan" : "Ubah Parameter Biaya"}</span>
+                  <span>Ubah Parameter Biaya</span>
                 </button>
 
                 <button
                   onClick={() => setIsAddEventOpen(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
                   <span>Tambah Transaksi</span>
                 </button>
               </div>
             </div>
-
-            {/* Quick Settings Drawer/Card (Collapsible inline) */}
-            {showSettingsPanel && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
-                {/* Standard Costs */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2">
-                    Biaya Tetap Per Event
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                        Operasional / Acara (I2)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.operasionalAcara}
-                        onChange={(e) => saveSettingsLocally({ ...settings, operasionalAcara: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                        Cashback Vendor (I3)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.cashback}
-                        onChange={(e) => saveSettingsLocally({ ...settings, cashback: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Field workers and gas */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2">
-                    Tenaga Kerja & Bensin
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                        Karyawan / Acara (I5)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.karyawanAcara}
-                        onChange={(e) => saveSettingsLocally({ ...settings, karyawanAcara: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                        Bensin / Acara (I6)
-                      </label>
-                      <input
-                        type="number"
-                        value={settings.bensinAcara}
-                        onChange={(e) => saveSettingsLocally({ ...settings, bensinAcara: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profit Sharing Partners */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2">
-                    Mitra Bagi Hasil & Pengadaan
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 1</label>
-                      <input
-                        type="text"
-                        value={settings.partner1Name}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner1Name: e.target.value })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Porsi Bagi Hasil %</label>
-                      <input
-                        type="number"
-                        value={settings.partner1Share}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner1Share: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 2</label>
-                      <input
-                        type="text"
-                        value={settings.partner2Name}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner2Name: e.target.value })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Porsi Bagi Hasil %</label>
-                      <input
-                        type="number"
-                        value={settings.partner2Share}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner2Share: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Pengadaan Asset Global (Summary L9)</label>
-                    <input
-                      type="number"
-                      value={settings.pengadaanKeseluruhanKeluar}
-                      onChange={(e) => saveSettingsLocally({ ...settings, pengadaanKeseluruhanKeluar: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* --- KPI STAT CARDS --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
@@ -658,7 +659,7 @@ export default function App() {
                 icon={<Layers className="w-5 h-5" />}
                 colorClass="text-cyan-400"
                 description="Total investasi pengadaan keseluruhan"
-                badgeText="Summary L9"
+                badgeText="Row 7"
                 badgeColorClass="bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
               />
             </div>
@@ -670,7 +671,7 @@ export default function App() {
             <EventTable events={events} settings={settings} onDeleteEvent={handleDeleteEvent} />
 
             {/* --- SYSTEM NOTION / FOOTER BAR --- */}
-            <div className="bg-zinc-900/40 p-6 rounded-2xl border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+            <div className="bg-zinc-900/40 p-6 rounded-2xl border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-sans">
               <div className="space-y-1">
                 <span className="font-bold text-zinc-300 flex items-center gap-1">
                   <Info className="w-4 h-4 text-blue-400" />
@@ -687,7 +688,9 @@ export default function App() {
               </div>
             </div>
           </>
-        ) : (
+        )}
+
+        {activeView === "invoice" && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl animate-fadeIn">
             <InvoiceGenerator
               events={events}
@@ -697,7 +700,254 @@ export default function App() {
           </div>
         )}
 
-      </div>
+        {activeView === "settings" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Page Header */}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-blue-500/10 text-blue-400 border border-blue-500/15 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
+                  Sistem & Sinkronisasi
+                </span>
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-white mt-1 flex items-center gap-2">
+                <span>Pengaturan & Database</span>
+                <Settings className="w-6 h-6 text-blue-500 stroke-[2] animate-spin-slow" />
+              </h1>
+              <p className="text-zinc-400 text-sm mt-1 max-w-2xl leading-relaxed">
+                Konfigurasi tautan integrasi Google Sheets dan setel parameter biaya operasional, gaji, bensin, dan pembagian hasil mitra.
+              </p>
+            </div>
+
+            {/* Google Sheets Integration Card */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <span className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-blue-500 shrink-0">
+                    <Database className="w-5 h-5 animate-pulse" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-200">Koneksi Google Sheets (Apps Script Web App)</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">Sinkronkan data transaksi dan parameter biaya secara real-time</p>
+                  </div>
+                </div>
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
+                  {appsScriptConfig.webAppUrl && (
+                    <button
+                      onClick={handleToggleDemoMode}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        appsScriptConfig.isDemoMode
+                          ? "bg-blue-500/10 text-blue-500 border-blue-500/25 hover:bg-blue-550/20"
+                          : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white"
+                      }`}
+                    >
+                      {appsScriptConfig.isDemoMode ? "Aktifkan Live Sheet" : "Masuk Mode Simulasi"}
+                    </button>
+                  )}
+                  {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl && (
+                    <button
+                      onClick={async () => {
+                        setIsSyncing(true);
+                        // Post settings to sheets first, which automatically updates and triggers pulling of latest database events & settings
+                        await handleUpdateSettingsOnSheet(settings);
+                      }}
+                      disabled={isSyncing}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 active:scale-95 disabled:opacity-50 text-blue-400 border border-zinc-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                      <span>{isSyncing ? "Menyelaras..." : "Gores Sinkron"}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsSetupGasOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer"
+                  >
+                    <CloudLightning className="w-3.5 h-3.5 text-white" />
+                    <span>{appsScriptConfig.webAppUrl ? "Ubah Koneksi Sheet" : "Hubungkan Google Sheet"}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs space-y-2 text-zinc-400 bg-zinc-950 p-4 rounded-xl border border-zinc-800">
+                <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
+                  <span>Status Aplikasi:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${appsScriptConfig.isDemoMode ? "bg-purple-950/40 text-purple-400 border border-purple-900/30 font-mono" : "bg-blue-950/40 text-blue-400 border border-blue-900/30 font-mono"}`}>
+                    {appsScriptConfig.isDemoMode ? "DEMO OFFLINE (SIMULASI)" : "LIVE GOOGLE SHEETS"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
+                  <span>Web App URL:</span>
+                  <span className="font-mono text-zinc-500 select-all truncate max-w-xs sm:max-w-md block" title={appsScriptConfig.webAppUrl}>
+                    {appsScriptConfig.webAppUrl || "Belum Terhubung"}
+                  </span>
+                </div>
+                {appsScriptConfig.lastSyncedAt && (
+                  <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
+                    <span>Waktu Sinkron Terakhir:</span>
+                    <span className="font-mono text-zinc-300">
+                      {new Date(appsScriptConfig.lastSyncedAt).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Cost Configuration Panel */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
+              {/* Standard Costs */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
+                  <span>Biaya Tetap Per Event</span>
+                  <span className="text-[10px] text-blue-400 font-mono">Row 2 & 3</span>
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                      Operasional / Acara (I2)
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.operasionalAcara}
+                      onChange={(e) => saveSettingsLocally({ ...settings, operasionalAcara: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                      Cashback Vendor (I3)
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.cashback}
+                      onChange={(e) => saveSettingsLocally({ ...settings, cashback: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Field workers and gas */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
+                  <span>Tenaga Kerja & Bensin</span>
+                  <span className="text-[10px] text-blue-400 font-mono">Row 5 & 6</span>
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                      Karyawan / Acara (I5)
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.karyawanAcara}
+                      onChange={(e) => saveSettingsLocally({ ...settings, karyawanAcara: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                      Bensin / Acara (I6)
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.bensinAcara}
+                      onChange={(e) => saveSettingsLocally({ ...settings, bensinAcara: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Profit Sharing Partners */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
+                  <span>Mitra & Pengadaan</span>
+                  <span className="text-[10px] text-blue-400 font-mono">Row 7</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 1</label>
+                    <input
+                      type="text"
+                      value={settings.partner1Name}
+                      onChange={(e) => saveSettingsLocally({ ...settings, partner1Name: e.target.value })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
+                    <input
+                      type="number"
+                      value={settings.partner1Share}
+                      onChange={(e) => saveSettingsLocally({ ...settings, partner1Share: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 2</label>
+                    <input
+                      type="text"
+                      value={settings.partner2Name}
+                      onChange={(e) => saveSettingsLocally({ ...settings, partner2Name: e.target.value })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
+                    <input
+                      type="number"
+                      value={settings.partner2Share}
+                      onChange={(e) => saveSettingsLocally({ ...settings, partner2Share: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Pengadaan Keseluruhan Keluar (I7)</label>
+                  <input
+                    type="number"
+                    value={settings.pengadaanKeseluruhanKeluar}
+                    onChange={(e) => saveSettingsLocally({ ...settings, pengadaanKeseluruhanKeluar: Number(e.target.value) })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Reset Option Footer */}
+              <div className="col-span-1 md:col-span-3 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-zinc-800/60 pt-4 mt-2">
+                <div className="text-xs text-zinc-400 font-sans">
+                  {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl ? (
+                    <span className="flex items-center gap-1.5 text-blue-400 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Parameter disimpan lokal di website. Klik tombol "Gores Sinkron" untuk menyelaraskan ke Google Sheets.
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500">
+                      Mode Simulasi Aktif.
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Baru: Operasional (Rp300k), Cashback (Rp100k), Karyawan (Rp250k), Bensin (Rp25k), Pengadaan (L9).")) {
+                      const nextSettings = { ...DEFAULT_SETTINGS };
+                      saveSettingsLocally(nextSettings);
+                      handleUpdateSettingsOnSheet(nextSettings);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Kembalikan ke Parameter Default</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
 
       {/* --- ADD EVENT MODAL --- */}
       {isAddEventOpen && (
@@ -716,6 +966,196 @@ export default function App() {
           onClose={() => setIsSetupGasOpen(false)}
           onTestConnection={handleTestConnection}
         />
+      )}
+
+      {/* --- COST SETTINGS MODAL (POP-UP ON DASHBOARD) --- */}
+      {isCostModalOpen && (
+        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-zinc-800/80 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Sliders className="w-5 h-5 text-blue-500" />
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-100">Ubah Parameter Biaya Usaha</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Konfigurasi operasional, gaji, bensin, dan bagi hasil mitra</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCostModalOpen(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Inputs Form Body */}
+            <div className="p-6 space-y-6 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Standard Costs */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
+                    <span>Biaya Tetap Per Event</span>
+                    <span className="text-[10px] text-blue-400 font-mono">Row 2 & 3</span>
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                        Operasional / Acara (I2)
+                      </label>
+                      <input
+                        type="number"
+                        value={settings.operasionalAcara}
+                        onChange={(e) => saveSettingsLocally({ ...settings, operasionalAcara: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                        Cashback Vendor (I3)
+                      </label>
+                      <input
+                        type="number"
+                        value={settings.cashback}
+                        onChange={(e) => saveSettingsLocally({ ...settings, cashback: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Field workers and gas */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
+                    <span>Tenaga Kerja & Bensin</span>
+                    <span className="text-[10px] text-blue-400 font-mono">Row 5 & 6</span>
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                        Karyawan / Acara (I5)
+                      </label>
+                      <input
+                        type="number"
+                        value={settings.karyawanAcara}
+                        onChange={(e) => saveSettingsLocally({ ...settings, karyawanAcara: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
+                        Bensin / Acara (I6)
+                      </label>
+                      <input
+                        type="number"
+                        value={settings.bensinAcara}
+                        onChange={(e) => saveSettingsLocally({ ...settings, bensinAcara: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profit Sharing Partners */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
+                    <span>Mitra & Pengadaan</span>
+                    <span className="text-[10px] text-blue-400 font-mono">Row 7</span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 1</label>
+                      <input
+                        type="text"
+                        value={settings.partner1Name}
+                        onChange={(e) => saveSettingsLocally({ ...settings, partner1Name: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
+                      <input
+                        type="number"
+                        value={settings.partner1Share}
+                        onChange={(e) => saveSettingsLocally({ ...settings, partner1Share: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 2</label>
+                      <input
+                        type="text"
+                        value={settings.partner2Name}
+                        onChange={(e) => saveSettingsLocally({ ...settings, partner2Name: e.target.value })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
+                      <input
+                        type="number"
+                        value={settings.partner2Share}
+                        onChange={(e) => saveSettingsLocally({ ...settings, partner2Share: Number(e.target.value) })}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Pengadaan Keseluruhan Keluar (I7)</label>
+                    <input
+                      type="number"
+                      value={settings.pengadaanKeseluruhanKeluar}
+                      onChange={(e) => saveSettingsLocally({ ...settings, pengadaanKeseluruhanKeluar: Number(e.target.value) })}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Reset Option Footer */}
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-zinc-800/60 pt-4 mt-2">
+                <div className="text-xs text-zinc-400 font-sans">
+                  {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl ? (
+                    <span className="flex items-center gap-1.5 text-blue-400 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Parameter disimpan lokal di website. Klik tombol "Gores Sinkron" untuk menyelaraskan ke Google Sheets.
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500">
+                      Mode Simulasi Aktif. Hubungkan Google Sheets di menu pengaturan untuk menyelaraskan parameter.
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Baru: Operasional (Rp300k), Cashback (Rp100k), Karyawan (Rp250k), Bensin (Rp25k), Pengadaan (L9).")) {
+                      const nextSettings = { ...DEFAULT_SETTINGS };
+                      saveSettingsLocally(nextSettings);
+                      handleUpdateSettingsOnSheet(nextSettings);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0 animate-pulse"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Kembalikan ke Parameter Default</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-zinc-950 border-t border-zinc-800/60 flex justify-end">
+              <button
+                onClick={() => setIsCostModalOpen(false)}
+                className="px-5 py-2 hover:bg-zinc-800 hover:text-white active:scale-95 bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              >
+                Selesai & Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

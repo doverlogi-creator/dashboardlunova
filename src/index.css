@@ -14,7 +14,12 @@
   --color-zinc-400: #a1a1aa;
 }
 
+html,
 body {
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
   background-color: #09090b;
   color: #fafafa;
   font-family: var(--font-sans);

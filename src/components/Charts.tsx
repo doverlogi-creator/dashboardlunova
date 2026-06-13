@@ -116,80 +116,82 @@ export default function Charts({ events, settings }: ChartsProps) {
         </div>
 
         {/* Bar Visualizer */}
-        <div className="relative pt-6 min-h-[220px] flex items-end justify-between gap-1 sm:gap-2 border-b border-zinc-800 pb-2">
-          {monthlyData.map((d, idx) => {
-            const revPercent = (d.revenue / maxVal) * 100;
-            const profitPercent = (d.netProfit / maxVal) * 100;
-            const costPercent = (d.cost / maxVal) * 100;
+        <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
+          <div className="relative pt-6 min-h-[220px] flex items-end justify-between gap-1 sm:gap-2 border-b border-zinc-800 pb-2 min-w-[500px] md:min-w-0">
+            {monthlyData.map((d, idx) => {
+              const revPercent = (d.revenue / maxVal) * 100;
+              const profitPercent = (d.netProfit / maxVal) * 100;
+              const costPercent = (d.cost / maxVal) * 100;
 
-            const isHovered = hoveredBar === idx;
+              const isHovered = hoveredBar === idx;
 
-            return (
-              <div
-                key={d.monthName}
-                className="flex-1 flex flex-col items-center group relative cursor-pointer"
-                onMouseEnter={() => setHoveredBar(idx)}
-                onMouseLeave={() => setHoveredBar(null)}
-              >
-                {/* Visual stacked/adjacent bars */}
-                <div className="w-full flex items-end justify-center gap-[2px] sm:gap-[3px] h-[160px] relative">
-                  {/* Revenue Bar (Blue) */}
-                  <div
-                    style={{ height: `${revPercent}%` }}
-                    className={`w-[4px] sm:w-[8px] rounded-t-sm transition-all duration-300 ${
-                      isHovered ? "bg-blue-400" : "bg-blue-500/60 group-hover:bg-blue-500"
-                    }`}
-                  />
-                  {/* Profit Bar (Purple) */}
-                  <div
-                    style={{ height: `${profitPercent}%` }}
-                    className={`w-[4px] sm:w-[8px] rounded-t-sm transition-all duration-300 ${
-                      isHovered ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-500"
-                    }`}
-                  />
-                  {/* Operational Cost Bar (Zinc) */}
-                  <div
-                    style={{ height: `${costPercent}%` }}
-                    className={`w-[4px] sm:w-[8px] rounded-t-sm transition-all duration-300 ${
-                      isHovered ? "bg-zinc-400" : "bg-zinc-700/60 group-hover:bg-zinc-600"
-                    }`}
-                  />
-                </div>
-
-                {/* X Axis Label */}
-                <span className="text-[10px] font-mono font-medium text-zinc-500 mt-2 block group-hover:text-zinc-200">
-                  {d.monthName}
-                </span>
-
-                {/* Micro Tooltip */}
-                {isHovered && (
-                  <div className="absolute bottom-[170px] left-1/2 -translate-x-1/2 z-20 bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl shadow-xl w-[200px] pointer-events-none text-left">
-                    <div className="text-[11px] font-bold text-zinc-200 mb-1.5 border-b border-zinc-800 pb-1">
-                      Bulan {d.monthName} 2026
-                    </div>
-                    <div className="space-y-1 text-[10px] font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-zinc-450">Jumlah Event:</span>
-                        <span className="text-zinc-100 font-bold">{d.eventsCount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-blue-400">Pemasukan:</span>
-                        <span className="text-blue-400 font-semibold">{formatRupiah(d.revenue)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-purple-400">Net Profit:</span>
-                        <span className="text-purple-400 font-semibold">{formatRupiah(d.netProfit)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-zinc-400">Biaya Ops:</span>
-                        <span className="text-zinc-300 font-semibold">{formatRupiah(d.cost)}</span>
-                      </div>
-                    </div>
+              return (
+                <div
+                  key={d.monthName}
+                  className="flex-1 flex flex-col items-center group relative cursor-pointer"
+                  onMouseEnter={() => setHoveredBar(idx)}
+                  onMouseLeave={() => setHoveredBar(null)}
+                >
+                  {/* Visual stacked/adjacent bars */}
+                  <div className="w-full flex items-end justify-center gap-[2px] sm:gap-[3px] h-[160px] relative">
+                    {/* Revenue Bar (Blue) */}
+                    <div
+                      style={{ height: `${revPercent}%` }}
+                      className={`w-[4px] sm:w-[8px] rounded-t-sm transition-all duration-300 ${
+                        isHovered ? "bg-blue-400" : "bg-blue-500/60 group-hover:bg-blue-500"
+                      }`}
+                    />
+                    {/* Profit Bar (Purple) */}
+                    <div
+                      style={{ height: `${profitPercent}%` }}
+                      className={`w-[4px] sm:w-[8px] rounded-t-sm transition-all duration-300 ${
+                        isHovered ? "bg-purple-400" : "bg-purple-500/60 group-hover:bg-purple-500"
+                      }`}
+                    />
+                    {/* Operational Cost Bar (Zinc) */}
+                    <div
+                      style={{ height: `${costPercent}%` }}
+                      className={`w-[4px] sm:w-[8px] rounded-t-sm transition-all duration-300 ${
+                        isHovered ? "bg-zinc-400" : "bg-zinc-700/60 group-hover:bg-zinc-600"
+                      }`}
+                    />
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  {/* X Axis Label */}
+                  <span className="text-[10px] font-mono font-medium text-zinc-500 mt-2 block group-hover:text-zinc-200">
+                    {d.monthName}
+                  </span>
+
+                  {/* Micro Tooltip */}
+                  {isHovered && (
+                    <div className="absolute bottom-[170px] left-1/2 -translate-x-1/2 z-20 bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl shadow-xl w-[200px] pointer-events-none text-left">
+                      <div className="text-[11px] font-bold text-zinc-200 mb-1.5 border-b border-zinc-800 pb-1">
+                        Bulan {d.monthName} 2026
+                      </div>
+                      <div className="space-y-1 text-[10px] font-mono">
+                        <div className="flex justify-between">
+                          <span className="text-zinc-450">Jumlah Event:</span>
+                          <span className="text-zinc-100 font-bold">{d.eventsCount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-blue-400">Pemasukan:</span>
+                          <span className="text-blue-400 font-semibold">{formatRupiah(d.revenue)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-400">Net Profit:</span>
+                          <span className="text-purple-400 font-semibold">{formatRupiah(d.netProfit)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-zinc-400">Biaya Ops:</span>
+                          <span className="text-zinc-300 font-semibold">{formatRupiah(d.cost)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

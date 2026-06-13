@@ -756,13 +756,14 @@ export default function InvoiceGenerator({ events, settings, onBack }: InvoiceGe
         </div>
 
         {/* RIGHT COLUMN: PREVIEW ASPECT A5 PAPER */}
-        <div className="lg:col-span-7 flex flex-col items-center">
-          <span className="text-xs text-zinc-500 mb-2 block font-mono">
+        <div className="lg:col-span-7 flex flex-col items-center w-full overflow-hidden">
+          <span className="text-xs text-zinc-500 mb-2 block font-mono text-center">
             Preview Simulasi Kertas A5 (Fidelitas Cetak)
           </span>
 
-          {/* OUTLINE BOX CORRESPONDING TO A5 RATIO */}
-          <div className="w-full max-w-[560px] bg-white text-zinc-900 border border-zinc-300 select-none shadow-2xl relative select-text" style={{ contentVisibility: "auto" }}>
+          <div className="w-full overflow-x-auto pb-4 flex justify-start sm:justify-center scrollbar-thin">
+            {/* OUTLINE BOX CORRESPONDING TO A5 RATIO */}
+            <div className="w-[560px] shrink-0 bg-white text-zinc-900 border border-zinc-300 select-none shadow-2xl relative select-text" style={{ contentVisibility: "auto" }}>
             
             {/* WRAPPER FOR PRINT TARGET */}
             <div id="invoice-print-area" className="p-7 font-sans bg-white leading-tight flex flex-col justify-between" style={{ minHeight: "780px", aspectRatio: "1 / 1.414" }}>
@@ -1017,6 +1018,7 @@ export default function InvoiceGenerator({ events, settings, onBack }: InvoiceGe
               </div>
 
             </div>
+          </div>
           </div>
         </div>
       </div>
