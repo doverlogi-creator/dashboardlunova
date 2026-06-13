@@ -117,7 +117,7 @@ export default function Charts({ events, settings }: ChartsProps) {
 
         {/* Bar Visualizer */}
         <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
-          <div className="relative pt-6 min-h-[220px] flex items-end justify-between gap-1 sm:gap-2 border-b border-zinc-800 pb-2 min-w-[500px] md:min-w-0">
+          <div className="relative pt-6 min-h-[350px] flex items-end justify-between gap-1 sm:gap-2 border-b border-zinc-800 pb-2 min-w-[500px] md:min-w-0">
             {monthlyData.map((d, idx) => {
               const revPercent = (d.revenue / maxVal) * 100;
               const profitPercent = (d.netProfit / maxVal) * 100;

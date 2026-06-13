@@ -48,11 +48,18 @@ function doGet(e) {
     var row = values[i];
     if (!row) continue;
     
-    // Abaikan baris kosong atau baris penampung format template
+    // Abaikan baris kosong, baris penampung format template, atau baris Total/Jumlah
     var dateStr = String(row[0] || "").trim().toLowerCase();
+    var jenisPaketStr = String(row[1] || "").trim().toLowerCase();
     var vendorStr = String(row[2] || "").trim().toLowerCase();
     
-    if (dateStr === "" || dateStr === "dd/mm/yyyy" || dateStr === "tanggal" || vendorStr === "vendor/wo" || vendorStr === "vendor") {
+    if (
+      dateStr === "" || dateStr === "dd/mm/yyyy" || dateStr === "tanggal" || 
+      dateStr.indexOf("total") !== -1 || dateStr.indexOf("jumlah") !== -1 ||
+      jenisPaketStr.indexOf("total") !== -1 || jenisPaketStr.indexOf("jumlah") !== -1 ||
+      vendorStr === "vendor/wo" || vendorStr === "vendor" ||
+      vendorStr.indexOf("total") !== -1 || vendorStr.indexOf("jumlah") !== -1
+    ) {
       continue;
     }
     
@@ -103,7 +110,7 @@ function doGet(e) {
     cashback: parseRupiahValue(sheet.getRange("I3").getValue()) || 100000,
     karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()) || 250000,
     bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()) || 25000,
-    pengadaanKeseluruhanKeluar: parseRupiahValue(sheet.getRange("I7").getValue()) || 7208099,
+    pengadaanKeseluruhanKeluar: parseRupiahValue(sheet.getRange("I7").getValue()) || 340000,
     partner1Name: String(sheet.getRange("K9").getValue() || "Neovan").trim(),
     partner1Share: parsePercentageValue(sheet.getRange("J9").getValue(), 40),
     partner2Name: String(sheet.getRange("K10").getValue() || "Surya").trim(),
@@ -350,7 +357,7 @@ function myFunction() {
                     - Baris 3: <code className="text-blue-400">Cashback</code> di H3, nilainya di I3 (e.g. <code className="text-zinc-300">100000</code>)<br />
                     - Baris 5: <code className="text-blue-400">Karyawan / acara</code> di H5, nilainya di I5 (e.g. <code className="text-zinc-300">250000</code>)<br />
                     - Baris 6: <code className="text-blue-400">Bensin / acara</code> di H6, nilainya di I6 (e.g. <code className="text-zinc-300">25000</code>)<br />
-                    - Baris 7: <code className="text-blue-400">Pengadaan Keseluruhan Keluar</code> di H7, nilainya di I7 (e.g. <code className="text-zinc-300">7208099</code>)<br />
+                    - Baris 7: <code className="text-blue-400">Pengadaan Keseluruhan Keluar</code> di H7, nilainya di I7 (e.g. <code className="text-zinc-300">340000</code>)<br />
                     - Baris 9 (Mitra 1): Share di <code className="text-blue-400">J9</code> (e.g. <code className="text-zinc-300">40%</code>) dan Nama di <code className="text-blue-400">K9</code> (e.g. <code className="text-zinc-300">Neovan</code>)<br />
                     - Baris 10 (Mitra 2): Share di <code className="text-blue-400">J10</code> (e.g. <code className="text-zinc-300">40%</code>) dan Nama di <code className="text-blue-400">K10</code> (e.g. <code className="text-zinc-300">Surya</code>)<br />
                     - Total Keuntungan Bersih: Nilai diatur dan dihitung secara organik real-time berdasarkan akumulasi total dari tiap rincian transaksi persewaan yang ada.<br />

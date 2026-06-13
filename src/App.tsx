@@ -32,7 +32,9 @@ import {
   LayoutDashboard,
   Settings,
   Menu,
-  X
+  X,
+  Sun,
+  Moon
 } from "lucide-react";
 
 import { EventData, CostSettings, AppsScriptConfig } from "./types";
@@ -56,12 +58,32 @@ export default function App() {
     lastSyncedAt: null,
   });
 
+  const [theme, setTheme] = useState<"light" | "dark" | "">("");
+
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
   const [isSetupGasOpen, setIsSetupGasOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+
+  // --- THEME INITIAL COUPLING ---
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("lighting_theme_2026") || "dark";
+    setTheme(savedTheme as "light" | "dark");
+  }, []);
+
+  useEffect(() => {
+    if (!theme) return;
+    localStorage.setItem("lighting_theme_2026", theme);
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+      document.body.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+      document.body.classList.remove("light");
+    }
+  }, [theme]);
 
   // --- INITIAL LOAD ---
   useEffect(() => {
@@ -132,8 +154,21 @@ export default function App() {
         if (!evt.tanggal) return false;
         const t = String(evt.tanggal).trim().toLowerCase();
         const v = String(evt.vendor || "").trim().toLowerCase();
-        // Skip default/placeholder/empty template rows
-        if (t === "dd/mm/yyyy" || t === "tanggal" || t === "" || v === "vendor/wo" || v === "vendor") {
+        const jp = String(evt.jenisPaket || "").trim().toLowerCase();
+        // Skip default/placeholder/empty template rows or summary/total rows
+        if (
+          t === "dd/mm/yyyy" || 
+          t === "tanggal" || 
+          t === "" || 
+          v === "vendor/wo" || 
+          v === "vendor" ||
+          t.includes("total") ||
+          t.includes("jumlah") ||
+          v.includes("total") ||
+          v.includes("jumlah") ||
+          jp.includes("total") ||
+          jp.includes("jumlah")
+        ) {
           return false;
         }
         return true;
@@ -464,12 +499,29 @@ export default function App() {
           </div>
         </div>
 
-        {/* Database Status Alert */}
-        <div className="flex items-center gap-2 bg-zinc-950/50 border border-zinc-800 px-3 py-1.5 rounded-xl">
-          <span className={`w-2 h-2 rounded-full ${appsScriptConfig.isDemoMode ? "bg-purple-500 animate-pulse" : "bg-blue-500"}`} />
-          <span className="text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
-            {appsScriptConfig.isDemoMode ? "Mode Simulasi" : "Sheets Terhubung"}
-          </span>
+        {/* Right side controls (Theme Toggle + Database Status Alert) */}
+        <div className="flex items-center gap-3">
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl border border-zinc-800 bg-zinc-950/40 transition-all cursor-pointer flex items-center justify-center outline-none"
+            title={theme === "light" ? "Aktifkan Mode Gelap (Dark Mode)" : "Aktifkan Mode Terang (Light Mode)"}
+          >
+            {theme === "light" ? (
+              <Moon className="w-4 h-4 text-blue-500" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-500" />
+            )}
+          </button>
+
+          {/* Database Status Alert */}
+          <div className="flex items-center gap-2 bg-zinc-950/50 border border-zinc-800 px-3 py-1.5 rounded-xl">
+            <span className={`w-2 h-2 rounded-full ${appsScriptConfig.isDemoMode ? "bg-purple-500 animate-pulse" : "bg-blue-500"}`} />
+            <span className="text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider text-zinc-400">
+              {appsScriptConfig.isDemoMode ? "Mode Simulasi" : "Sheets Terhubung"}
+            </span>
+          </div>
         </div>
       </div>
 

@@ -763,7 +763,7 @@ export default function InvoiceGenerator({ events, settings, onBack }: InvoiceGe
 
           <div className="w-full overflow-x-auto pb-4 flex justify-start sm:justify-center scrollbar-thin">
             {/* OUTLINE BOX CORRESPONDING TO A5 RATIO */}
-            <div className="w-[560px] shrink-0 bg-white text-zinc-900 border border-zinc-300 select-none shadow-2xl relative select-text" style={{ contentVisibility: "auto" }}>
+            <div className="w-[560px] shrink-0 bg-white text-zinc-900 border border-zinc-300 select-none shadow-2xl relative select-text invoice-isolation" style={{ contentVisibility: "auto" }}>
             
             {/* WRAPPER FOR PRINT TARGET */}
             <div id="invoice-print-area" className="p-7 font-sans bg-white leading-tight flex flex-col justify-between" style={{ minHeight: "780px", aspectRatio: "1 / 1.414" }}>
