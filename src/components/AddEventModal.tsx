@@ -127,7 +127,7 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
                       if (presetPrices[key] !== undefined) {
                         setPemasukan(String(presetPrices[key]));
                       } else {
-                        // Match exactly from similar package type in sheet raw data
+                        // Match exactly from similar package type in sheet "Pengisian data"
                         const matched = events.find(
                           (evt) => evt.jenisPaket.trim().toLowerCase() === key
                         );
@@ -168,7 +168,7 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
               {!jenisPaket.toLowerCase().includes("custom") && !jenisPaket.toLowerCase().includes("costum") && jenisPaket.trim() !== "" && (
                 <p className="text-[9px] text-emerald-400 font-semibold mt-1 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  Menyesuaikan baris Raw_Data kolom F
+                  Menyesuaikan baris Pengisian data kolom F
                 </p>
               )}
             </div>

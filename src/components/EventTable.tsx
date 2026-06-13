@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { formatRupiah, formatDateIndo } from "../utils";
+import { formatRupiah, formatDateIndo, parseDate } from "../utils";
 import { EventData, CostSettings } from "../types";
 import { getEventFinances } from "../utils";
 import { Search, Calendar, Phone, MapPin, Tag, Briefcase, Trash2, Eye, X } from "lucide-react";
@@ -36,7 +36,7 @@ export default function EventTable({ events, settings, onDeleteEvent }: EventTab
     const matchesPackage = selectedPackage === "all" || evt.jenisPaket === selectedPackage;
 
     return matchesSearch && matchesVendor && matchesPackage;
-  }).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()); // sort newest first
+  }).sort((a, b) => parseDate(b.tanggal).getTime() - parseDate(a.tanggal).getTime()); // sort newest first
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col">

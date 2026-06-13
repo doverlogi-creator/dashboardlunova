@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { formatRupiah } from "../utils";
+import { formatRupiah, parseDate } from "../utils";
 import { EventData, CostSettings } from "../types";
 import { getEventFinances } from "../utils";
 import { Award, Zap, TrendingUp, Users } from "lucide-react";
@@ -28,7 +28,7 @@ export default function Charts({ events, settings }: ChartsProps) {
     // Filter events for this month in Year 2026
     const monthEvents = events.filter((evt) => {
       if (!evt.tanggal) return false;
-      const dat = new Date(evt.tanggal);
+      const dat = parseDate(evt.tanggal);
       return !isNaN(dat.getTime()) && dat.getMonth() === index && dat.getFullYear() === 2026;
     });
 

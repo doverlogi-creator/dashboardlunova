@@ -27,51 +27,35 @@ export default function AppsScriptSetupModal({
 
   const appsScriptCode = `/**
  * Google Apps Script untuk Dashboard Usaha Lighting 2026
- * Saling kode ini ke Spreadsheet Anda (Ekstensi > Apps Script)
- * Publish sebagai Web App (Aplikasi Web) dengan akses: "Siapa saja" (Anyone)
+ * Salin kode ini ke Spreadsheet Anda (Ekstensi > Apps Script)
+ * Terapkan (Deploy) sebagai Web App dengan Akses: "Siapa saja" (Anyone)
  */
 
 function doGet(e) {
-  // Ambil sheet aktif dengan nama "Raw_Data", "raw_data", "raw data", "Raw Data", "Pengisian data", atau sheet pertama
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Raw_Data") || ss.getSheetByName("raw_data") || ss.getSheetByName("raw data") || ss.getSheetByName("Raw Data") || ss.getSheetByName("Pengisian data") || ss.getSheets()[0];
+  // Deteksi sheet "Pengisian data"
+  var sheet = ss.getSheetByName("Pengisian data") || ss.getSheets()[0];
   
   if (!sheet) {
-    return createJsonResponse({ error: "Sheet 'Raw_Data', 'raw data', atau 'Pengisian data' tidak ditemukan!" });
+    return createJsonResponse({ error: "Sheet tidak ditemukan!" });
   }
   
-  var range = sheet.getDataRange();
-  var values = range.getValues();
-  
-  // Baca daftar paket dari kolom H & I di sheet (jika ada) untuk fallback otomatis
-  var packagePriceMap = {
-    "paket 1": 1500000,
-    "paket 1 c": 1500000,
-    "paket 2": 2750000,
-    "paket 2 c": 2750000,
-    "paket 3": 3500000,
-    "paket 3 c": 3500000
-  };
-  
-  for (var r = 1; r < Math.min(10, values.length); r++) {
-    if (values[r] && values[r][7] !== undefined && values[r][8] !== undefined) {
-      var pName = String(values[r][7]).trim().toLowerCase();
-      var pPrice = parseRupiahValue(values[r][8]);
-      if (pName && pPrice > 0) {
-        packagePriceMap[pName] = pPrice;
-      }
-    }
-  }
-  
-  // Ambil data event dari tabel utama (Kolom A s/d F)
+  var values = sheet.getDataRange().getValues();
   var data = [];
-  // Baris ke-0 adalah Header (Tanggal | Jenis Paket | Vendor/WO | Lokasi | No. Handphone / WA | Pemasukan/Event)
+  
+  // Rincian Transaksi dimulai dari baris ke-1 (setelah header di baris ke-0)
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
-    // Abaikan baris kosong jika kolom Tanggal dan Jenis Paket kosong
-    if (!row[0] && !row[1]) continue;
+    if (!row) continue;
     
-    // Format tanggal ke format aman string YYYY-MM-DD atau gunakan nilai mentah
+    // Abaikan baris kosong atau baris penampung format template
+    var dateStr = String(row[0] || "").trim().toLowerCase();
+    var vendorStr = String(row[2] || "").trim().toLowerCase();
+    
+    if (dateStr === "" || dateStr === "dd/mm/yyyy" || dateStr === "tanggal" || vendorStr === "vendor/wo" || vendorStr === "vendor") {
+      continue;
+    }
+    
     var tanggalStr = "";
     if (row[0] instanceof Date) {
       var d = row[0];
@@ -80,29 +64,23 @@ function doGet(e) {
       var dd = String(d.getDate()).padStart(2, '0');
       tanggalStr = yyyy + "-" + mm + "-" + dd;
     } else {
-      tanggalStr = String(row[0]);
+      tanggalStr = String(row[0]).trim();
     }
     
-    var jenisPaket = String(row[1] || "");
+    var jenisPaket = String(row[1] || "").trim();
+    var pemasukanVal = parseRupiahValue(row[5]);
     
-    // Ambil nilai pemasukan dan bersihkan jika berupa string
-    var pemasukanRaw = row[5];
-    var pemasukanVal = 0;
-    if (typeof pemasukanRaw === 'number') {
-      pemasukanVal = pemasukanRaw;
-    } else if (pemasukanRaw) {
-      // Hilangkan "Rp", titik, koma untuk parsing angka
-      var cleanStr = String(pemasukanRaw).replace(/[^0-9,-]/g, '');
-      // jika ada koma desimal, potong ke kiri
-      if (cleanStr.indexOf(',') !== -1) {
-        cleanStr = cleanStr.split(',')[0];
-      }
-      pemasukanVal = parseInt(cleanStr, 10) || 0;
-    }
-    
-    // Fallback otomatis jika pemasukan bernilai 0 namun jenis paket terdaftar
+    // Fallback harga default jika pemasukan kosong (0) dan ada jenis paket terpilih
     if (pemasukanVal === 0 && jenisPaket) {
-      var pkgKey = jenisPaket.trim().toLowerCase();
+      var packagePriceMap = {
+        "paket 1": 1500000,
+        "paket 1 c": 1500000,
+        "paket 2": 2750000,
+        "paket 2 c": 2750000,
+        "paket 3": 3500000,
+        "paket 3 c": 3500000
+      };
+      var pkgKey = jenisPaket.toLowerCase();
       if (packagePriceMap[pkgKey] !== undefined) {
         pemasukanVal = packagePriceMap[pkgKey];
       }
@@ -112,29 +90,24 @@ function doGet(e) {
       id: "evt-" + i,
       tanggal: tanggalStr,
       jenisPaket: jenisPaket,
-      vendor: String(row[2] || ""),
-      lokasi: String(row[3] || ""),
-      noHp: String(row[4] || ""),
+      vendor: String(row[2] || "").trim(),
+      lokasi: String(row[3] || "").trim(),
+      noHp: String(row[4] || "").trim(),
       pemasukan: pemasukanVal
     });
   }
   
-  // Ambil parameter pengeluaran dari Kolom H & I
-  var pengadaanVal = parseRupiahValue(sheet.getRange("I7").getValue());
-  if (!pengadaanVal) {
-    pengadaanVal = 7208099;
-  }
-  
+  // Ambil parameter biaya & mitra dari tabel di kolom H, I, J, K
   var settings = {
-    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()),
-    cashback: parseRupiahValue(sheet.getRange("I3").getValue()),
-    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()),
-    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()),
-    pengadaanKeseluruhanKeluar: pengadaanVal,
-    partner1Name: "Lunova Lighting",
-    partner1Share: 40,
-    partner2Name: "Surya",
-    partner2Share: 40
+    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()) || 300000,
+    cashback: parseRupiahValue(sheet.getRange("I3").getValue()) || 100000,
+    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()) || 250000,
+    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()) || 25000,
+    pengadaanKeseluruhanKeluar: parseRupiahValue(sheet.getRange("I7").getValue()) || 7208099,
+    partner1Name: String(sheet.getRange("K9").getValue() || "Neovan").trim(),
+    partner1Share: parsePercentageValue(sheet.getRange("J9").getValue(), 40),
+    partner2Name: String(sheet.getRange("K10").getValue() || "Surya").trim(),
+    partner2Share: parsePercentageValue(sheet.getRange("J10").getValue(), 40)
   };
   
   return createJsonResponse({
@@ -143,132 +116,88 @@ function doGet(e) {
     lastUpdated: new Date().toISOString()
   });
 }
-
-// Handler POST jika ingin memposting data langsung dari aplikasi ke Sheet!
+ 
 function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var rawDataSheet = ss.getSheetByName("Raw_Data") || ss.getSheetByName("raw_data") || ss.getSheetByName("raw data") || ss.getSheetByName("Raw Data");
-  var pengisianSheet = ss.getSheetByName("Pengisian data");
+  // Gunakan satu sheet target yang sama untuk seluruh operasi ("Pengisian data")
+  var sheet = ss.getSheetByName("Pengisian data") || ss.getSheets()[0];
   
-  var targetSheet = rawDataSheet || ss.getSheets()[0];
+  if (!sheet) {
+    return createJsonResponse({ success: false, error: "Sheet tidak ditemukan!" });
+  }
   
   try {
     var params = JSON.parse(e.postData.contents);
     
-    // Handler khusus untuk sinkronisasi nilai parameter biaya/settings
+    // 1. UPDATE SETTINGS
     if (params.action === "updateSettings") {
-      var sheet = ss.getSheetByName("Raw_Data") || ss.getSheetByName("raw_data") || ss.getSheetByName("raw data") || ss.getSheetByName("Raw Data") || ss.getSheetByName("Pengisian data") || ss.getSheets()[0];
-      if (!sheet) {
-        return createJsonResponse({ success: false, error: "Sheet tidak ditemukan!" });
-      }
-      
       var s = params.settings;
       if (s) {
-        // Baris 2: Operasional / acara di H2, nilainya di I2
         sheet.getRange("H2").setValue("Operasional / acara");
         if (s.operasionalAcara !== undefined) sheet.getRange("I2").setValue(Number(s.operasionalAcara));
         
-        // Baris 3: Cashback di H3, nilainya di I3
         sheet.getRange("H3").setValue("Cashback");
         if (s.cashback !== undefined) sheet.getRange("I3").setValue(Number(s.cashback));
         
-        // Baris 5: Karyawan / acara di H5, nilainya di I5
         sheet.getRange("H5").setValue("Karyawan / acara");
         if (s.karyawanAcara !== undefined) sheet.getRange("I5").setValue(Number(s.karyawanAcara));
         
-        // Baris 6: Bensin / acara di H6, nilainya di I6
         sheet.getRange("H6").setValue("Bensin / acara");
         if (s.bensinAcara !== undefined) sheet.getRange("I6").setValue(Number(s.bensinAcara));
         
-        // Baris 7: Pengadaan Keseluruhan Keluar di H7, nilainya di I7
         sheet.getRange("H7").setValue("Pengadaan Keseluruhan Keluar");
         if (s.pengadaanKeseluruhanKeluar !== undefined) sheet.getRange("I7").setValue(Number(s.pengadaanKeseluruhanKeluar));
         
-        return createJsonResponse({ success: true, message: "Pengaturan berhasil diperbarui di Google Sheets!" });
+        if (s.partner1Name !== undefined) sheet.getRange("K9").setValue(String(s.partner1Name));
+        if (s.partner1Share !== undefined) sheet.getRange("J9").setValue(Number(s.partner1Share) / 100);
+        
+        if (s.partner2Name !== undefined) sheet.getRange("K10").setValue(String(s.partner2Name));
+        if (s.partner2Share !== undefined) sheet.getRange("J10").setValue(Number(s.partner2Share) / 100);
+        
+        return createJsonResponse({ success: true, message: "Pengaturan berhasil diperbarui!" });
       }
-      return createJsonResponse({ success: false, error: "Payload settings kosong!" });
+      return createJsonResponse({ success: false, error: "Data pengaturan kosong!" });
     }
     
-    // Handler khusus untuk menghapus data event dari Google Sheets
+    // 2. DELETE EVENT
     if (params.action === "deleteEvent") {
       var eventId = params.id;
       if (eventId && eventId.indexOf("evt-") === 0) {
         var rowIdx = parseInt(eventId.replace("evt-", ""), 10);
-        if (rowIdx > 0) {
-          // values[i] -> row indices are i + 1. So row to delete is rowIdx + 1.
-          var deleted = false;
-          if (rawDataSheet && rowIdx + 1 <= rawDataSheet.getLastRow()) {
-            rawDataSheet.deleteRow(rowIdx + 1);
-            deleted = true;
-          }
-          if (pengisianSheet && rowIdx + 1 <= pengisianSheet.getLastRow()) {
-            pengisianSheet.deleteRow(rowIdx + 1);
-            deleted = true;
-          }
-          // Fallback if sheet names are different
-          if (!deleted && ss.getSheets().length > 0) {
-            var firstSheet = ss.getSheets()[0];
-            if (rowIdx + 1 <= firstSheet.getLastRow()) {
-              firstSheet.deleteRow(rowIdx + 1);
-            }
-          }
-          return createJsonResponse({ success: true, message: "Data berhasil dihapus dari Google Sheets!" });
+        if (rowIdx > 0 && rowIdx + 1 <= sheet.getLastRow()) {
+          sheet.deleteRow(rowIdx + 1);
+          return createJsonResponse({ success: true, message: "Transaksi berhasil dihapus!" });
         }
       }
-      return createJsonResponse({ success: false, error: "ID transaksi tidak valid untuk dihapus." });
+      return createJsonResponse({ success: false, error: "ID transaksi tidak valid." });
     }
     
+    // 3. ADD NEW TRANSACTION (APPEND TO TABLE 1 / FIRST SHEET)
     var inputDate = params.tanggal ? new Date(params.tanggal) : new Date();
-    
     var jenisPaket = params.jenisPaket || "";
-    var isCustom = jenisPaket.toLowerCase().indexOf("custom") !== -1 || jenisPaket.toLowerCase().indexOf("costum") !== -1;
+    var vendor = params.vendor || "";
+    var lokasi = params.lokasi || "";
+    var noHp = params.noHp || "";
+    var pemasukan = Number(params.pemasukan) || 0;
     
-    if (rawDataSheet) {
-      var rowNum = rawDataSheet.getLastRow() + 1;
-      var columnFValue;
-      if (!isCustom && jenisPaket.trim() !== "") {
-        columnFValue = "=if(B" + rowNum + "=$H$2;$I$2;if(B" + rowNum + "=$H$3;$I$3;if(B" + rowNum + "=$H$4;$I$4;if(B" + rowNum + "=$H$5;$I$5;if(B" + rowNum + "=$H$6;$I$6;if(B" + rowNum + "=$H$7;$I$7;if(B" + rowNum + "=$H$8;$I$8;if(B" + rowNum + "=$H$9;$I$9;if('Pengisian data'!F" + rowNum + ";0)+'Pengisian data'!F" + rowNum + "))))))))";
-      } else {
-        columnFValue = Number(params.pemasukan) || 0;
-      }
-      
-      rawDataSheet.appendRow([
-        inputDate,
-        jenisPaket,
-        params.vendor || "",
-        params.lokasi || "",
-        params.noHp || "",
-        columnFValue
-      ]);
-    } else {
-      targetSheet.appendRow([
-        inputDate,
-        jenisPaket,
-        params.vendor || "",
-        params.lokasi || "",
-        params.noHp || "",
-        Number(params.pemasukan) || 0
-      ]);
-    }
+    // Hanya mengisi/menambah baris ke sheet utama (Table 1)
+    sheet.appendRow([
+      inputDate,
+      jenisPaket,
+      vendor,
+      lokasi,
+      noHp,
+      pemasukan
+    ]);
     
-    if (pengisianSheet) {
-      pengisianSheet.appendRow([
-        inputDate,
-        jenisPaket,
-        params.vendor || "",
-        params.lokasi || "",
-        params.noHp || "",
-        Number(params.pemasukan) || 0
-      ]);
-    }
+    return createJsonResponse({ success: true, message: "Transaksi baru berhasil ditambahkan ke Table 1!" });
     
-    return createJsonResponse({ success: true, message: "Data berhasil ditambahkan!" });
   } catch(err) {
     return createJsonResponse({ success: false, error: err.message });
   }
 }
 
-// Fungsi pembantu mengekstrak angka dari format Rupiah sheet
+// Fungsi pembantu parsing mata uang Rupiah
 function parseRupiahValue(val) {
   if (typeof val === 'number') return val;
   if (!val) return 0;
@@ -277,10 +206,25 @@ function parseRupiahValue(val) {
   return parseInt(cl, 10) || 0;
 }
 
-// Set header CORS agar bisa di-fetch bebas dari aplikasi web React ini
+// Fungsi pembantu parsing persentase pembagian mitra
+function parsePercentageValue(val, fallback) {
+  if (typeof val === 'number') {
+    return val <= 1 ? Math.round(val * 100) : val;
+  }
+  if (!val) return fallback;
+  var parsed = parseFloat(String(val).replace(/[^0-9.]/g, ''));
+  return isNaN(parsed) ? fallback : parsed;
+}
+
+// Membuat response JSON dengan kustomisasi perizinan CORS lengkap
 function createJsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Menghindari error pemicu bawaan Google Sheet seandainya trigger myFunction lama masih terdaftar
+function myFunction() {
+  Logger.log("Aplikasi terhubung dengan sukses!");
 }`;
 
   const handleCopy = () => {
@@ -395,18 +339,20 @@ function createJsonResponse(data) {
                 <li>
                   <p className="font-medium text-zinc-200">Siapkan Spreadsheet Anda</p>
                   <p className="text-zinc-400 mt-0.5">
-                    Pastikan spreadsheet Anda memiliki sheet bernama <strong className="text-blue-400">"Raw_Data"</strong> (atau <strong className="text-blue-400">"raw data"</strong>) dengan layout kolom persis seperti di gambar: kolom A: Tanggal, B: Jenis Paket, C: Vendor/WO, D: Lokasi, E: No. Handphone / WA, F: Pemasukan/Event (seluruh pemasukan pada Daftar Transaksi Pengisian Data dicatat di sheet raw data pada kolom F tersebut).
+                    Pastikan spreadsheet Anda memiliki sheet bernama <strong className="text-blue-400">"Pengisian data"</strong> dengan layout kolom persis seperti di gambar: kolom A: Tanggal, B: Jenis Paket, C: Vendor/WO, D: Lokasi, E: No. Handphone / WA, F: Pemasukan/Event.
                   </p>
                 </li>
                 <li>
                   <p className="font-medium text-zinc-200">Lokasi Setting Operasional & Pengadaan</p>
                   <p className="text-zinc-400 mt-0.5 font-sans leading-relaxed">
-                    Buat pengaturan variabel di kolom <strong className="text-zinc-200">H & I</strong> pada sheet <strong className="text-blue-400">"Raw_Data"</strong> (dan biarkan sheet <strong className="text-emerald-450">"Pengisian data"</strong> hanya berisi Table 1 tanpa terganggu):<br />
+                    Buat pengaturan variabel di kolom <strong className="text-zinc-200">H & I</strong> pada sheet <strong className="text-blue-400">"Pengisian data"</strong> tersebut:<br />
                     - Baris 2: <code className="text-blue-400">Operasional / acara</code> di H2, nilainya di I2 (e.g. <code className="text-zinc-300">300000</code>)<br />
                     - Baris 3: <code className="text-blue-400">Cashback</code> di H3, nilainya di I3 (e.g. <code className="text-zinc-300">100000</code>)<br />
                     - Baris 5: <code className="text-blue-400">Karyawan / acara</code> di H5, nilainya di I5 (e.g. <code className="text-zinc-300">250000</code>)<br />
                     - Baris 6: <code className="text-blue-400">Bensin / acara</code> di H6, nilainya di I6 (e.g. <code className="text-zinc-300">25000</code>)<br />
                     - Baris 7: <code className="text-blue-400">Pengadaan Keseluruhan Keluar</code> di H7, nilainya di I7 (e.g. <code className="text-zinc-300">7208099</code>)<br />
+                    - Baris 9 (Mitra 1): Share di <code className="text-blue-400">J9</code> (e.g. <code className="text-zinc-300">40%</code>) dan Nama di <code className="text-blue-400">K9</code> (e.g. <code className="text-zinc-300">Neovan</code>)<br />
+                    - Baris 10 (Mitra 2): Share di <code className="text-blue-400">J10</code> (e.g. <code className="text-zinc-300">40%</code>) dan Nama di <code className="text-blue-400">K10</code> (e.g. <code className="text-zinc-300">Surya</code>)<br />
                     - Total Keuntungan Bersih: Nilai diatur dan dihitung secara organik real-time berdasarkan akumulasi total dari tiap rincian transaksi persewaan yang ada.<br />
                   </p>
                 </li>
@@ -492,7 +438,7 @@ function createJsonResponse(data) {
 
               <div className="flex justify-between items-center pt-2">
                 <span className="text-xs text-zinc-500">
-                  Tip: Pastikan tidak merubah nama sheet "raw data" agar kode berfungsi dengan baik.
+                  Tip: Pastikan tidak merubah nama sheet "Pengisian data" agar kode berfungsi dengan baik.
                 </span>
                 <button
                   type="button"

@@ -127,24 +127,35 @@ export default function App() {
 
   // --- SYNC WITH LOCAL STORAGE ---
   const saveEventsLocally = (newEvents: EventData[]) => {
-    const processed = newEvents.map((evt) => {
-      let p = Number(evt.pemasukan) || 0;
-      if (p === 0 && evt.jenisPaket) {
-        const presetPrices: Record<string, number> = {
-          "paket 1": 1500000,
-          "paket 1 c": 1500000,
-          "paket 2": 2750000,
-          "paket 2 c": 2750000,
-          "paket 3": 3500000,
-          "paket 3 c": 3500000,
-        };
-        const key = evt.jenisPaket.trim().toLowerCase();
-        if (presetPrices[key] !== undefined) {
-          p = presetPrices[key];
+    const processed = newEvents
+      .filter((evt) => {
+        if (!evt.tanggal) return false;
+        const t = String(evt.tanggal).trim().toLowerCase();
+        const v = String(evt.vendor || "").trim().toLowerCase();
+        // Skip default/placeholder/empty template rows
+        if (t === "dd/mm/yyyy" || t === "tanggal" || t === "" || v === "vendor/wo" || v === "vendor") {
+          return false;
         }
-      }
-      return { ...evt, pemasukan: p };
-    });
+        return true;
+      })
+      .map((evt) => {
+        let p = Number(evt.pemasukan) || 0;
+        if (p === 0 && evt.jenisPaket) {
+          const presetPrices: Record<string, number> = {
+            "paket 1": 1500000,
+            "paket 1 c": 1500000,
+            "paket 2": 2750000,
+            "paket 2 c": 2750000,
+            "paket 3": 3500000,
+            "paket 3 c": 3500000,
+          };
+          const key = evt.jenisPaket.trim().toLowerCase();
+          if (presetPrices[key] !== undefined) {
+            p = presetPrices[key];
+          }
+        }
+        return { ...evt, pemasukan: p };
+      });
     setEvents(processed);
     localStorage.setItem("lighting_events_2026", JSON.stringify(processed));
   };
@@ -213,7 +224,11 @@ export default function App() {
       if (err.name === "AbortError" || err.message?.includes("abort")) {
         console.warn("Koneksi ke Google Sheets dibatalkan (timeout/user abort). Menggunakan cache lokal.");
       } else {
-        setSyncError(err.message || "Gagal menghubungi Google Apps Script. Cek jaringan atau perizinan webapp Anda.");
+        let friendlyError = err.message || "Gagal menghubungi Google Apps Script. Cek jaringan atau perizinan webapp Anda.";
+        if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("failed to fetch") || err.message.toLowerCase().includes("networkerror") || err.message.toLowerCase().includes("cross-origin"))) {
+          friendlyError = "Terjadi kesalahan 'Failed to Fetch' / CORS. Masalah ini biasanya diakibatkan karena URL Web App Apps Script salah, belum dideploy ulang setelah melakukan perubahan kode, atau akses perizinan 'Who has access' pada menu Deploy belum diatur ke 'Anyone' (Siapa saja).";
+        }
+        setSyncError(friendlyError);
       }
       // Cache Cadangan: If sync fails, load backup settings from localStorage
       const storedSettings = localStorage.getItem("lighting_settings_2026");
@@ -253,7 +268,11 @@ export default function App() {
       if (e.name === "AbortError" || e.message?.includes("abort")) {
         return { success: false, message: "Koneksi timeout. Google Sheets/Apps Script lambat merespons (silakan coba hubungkan kembali)." };
       }
-      return { success: false, message: e.message || "Kesalahan jaringan. Pastikan URL benar." };
+      let friendlyError = e.message || "Kesalahan jaringan. Pastikan URL benar.";
+      if (e.message && (e.message.includes("Failed to fetch") || e.message.includes("failed to fetch") || e.message.toLowerCase().includes("networkerror") || e.message.toLowerCase().includes("cross-origin"))) {
+        friendlyError = "Terjadi kesalahan 'Failed to Fetch' / CORS. Masalah ini biasanya diakibatkan karena URL Web App Apps Script salah, belum dideploy ulang setelah melakukan perubahan kode, atau akses perizinan 'Who has access' pada menu Deploy belum diatur ke 'Anyone' (Siapa saja).";
+      }
+      return { success: false, message: friendlyError };
     }
   };
 
@@ -654,7 +673,7 @@ export default function App() {
 
               <StatCard
                 id="kpi-kas"
-                title="Pengadaan Saat Ini"
+                title="Pengadaan Keluar"
                 value={totals.overheadCost}
                 icon={<Layers className="w-5 h-5" />}
                 colorClass="text-cyan-400"

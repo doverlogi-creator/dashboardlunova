@@ -275,7 +275,7 @@ export const DEFAULT_SETTINGS: CostSettings = {
   bensinAcara: 25000,
   pengadaanKeseluruhanKeluar: 7208099, // default disesuaikan dengan Column I7 (Baris 7)
   
-  partner1Name: "Lunova Lighting",
+  partner1Name: "Neovan",
   partner1Share: 40,
   partner2Name: "Surya",
   partner2Share: 40
