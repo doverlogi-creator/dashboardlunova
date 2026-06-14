@@ -16,7 +16,7 @@ interface AddEventModalProps {
 export default function AddEventModal({ onClose, onAddEvent, events }: AddEventModalProps) {
   const [tanggal, setTanggal] = useState(new Date().toISOString().split("T")[0]);
   const [jenisPaket, setJenisPaket] = useState("Custom");
-  const [vendor, setVendor] = useState("Happylee");
+  const [vendor, setVendor] = useState("");
   const [lokasi, setLokasi] = useState("");
   const [noHp, setNoHp] = useState("");
   const [pemasukan, setPemasukan] = useState("");
@@ -105,62 +105,36 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
                 <span className="absolute left-3.5 top-3.5 text-zinc-500">
                   <FileText className="w-4 h-4" />
                 </span>
-                <input
-                  type="text"
+                <select
                   value={jenisPaket}
-                  list="suggested-packages"
                   onChange={(e) => {
                     const val = e.target.value;
                     setJenisPaket(val);
-                    const isCustom = val.toLowerCase().includes("custom") || val.toLowerCase().includes("costum");
-                    if (!isCustom && val.trim() !== "") {
-                      const presetPrices: Record<string, number> = {
-                        "paket 1": 1500000,
-                        "paket 1 c": 1500000,
-                        "paket 2": 2750000,
-                        "paket 2 c": 2750000,
-                        "paket 3": 3500000,
-                        "paket 3 c": 3500000,
-                      };
-                      
-                      const key = val.trim().toLowerCase();
-                      if (presetPrices[key] !== undefined) {
-                        setPemasukan(String(presetPrices[key]));
-                      } else {
-                        // Match exactly from similar package type in sheet "Pengisian data"
-                        const matched = events.find(
-                          (evt) => evt.jenisPaket.trim().toLowerCase() === key
-                        );
-                        if (matched && matched.pemasukan > 0) {
-                          setPemasukan(String(matched.pemasukan));
-                        }
-                      }
+                    const presetPrices: Record<string, number> = {
+                      "Paket 1": 1500000,
+                      "Paket 1 C": 1500000,
+                      "Paket 2": 2750000,
+                      "Paket 2 C": 2750000,
+                      "Paket 3": 3500000,
+                      "Paket 3 C": 3500000,
+                    };
+                    if (presetPrices[val] !== undefined) {
+                      setPemasukan(String(presetPrices[val]));
                     }
                   }}
-                  placeholder="Paket Silver / Custom"
                   className={`w-full bg-zinc-950 border ${
                     errors.jenisPaket ? "border-red-500" : "border-zinc-800 focus:border-blue-500"
                   } rounded-xl pl-10 pr-4 py-3 text-sm text-zinc-250 outline-none transition-colors`}
-                />
-                
-                {/* Datalist for automatic package autocompletes from sheets */}
-                <datalist id="suggested-packages">
-                  {Array.from(
-                    new Set([
-                      "Paket 1",
-                      "Paket 1 C",
-                      "Paket 2",
-                      "Paket 2 C",
-                      "Paket 3",
-                      "Paket 3 C",
-                      ...events
-                        .map((e) => e.jenisPaket.trim())
-                        .filter((p) => p && !p.toLowerCase().includes("custom") && !p.toLowerCase().includes("costum"))
-                    ])
-                  ).map((pkgName) => (
-                    <option key={pkgName} value={pkgName} />
-                  ))}
-                </datalist>
+                >
+                  <option value="Paket 1">Paket 1</option>
+                  <option value="Paket 1 C">Paket 1 C</option>
+                  <option value="Paket 2">Paket 2</option>
+                  <option value="Paket 2 C">Paket 2 C</option>
+                  <option value="Paket 3">Paket 3</option>
+                  <option value="Paket 3 C">Paket 3 C</option>
+                  <option value="Custom">Custom</option>
+                  <option value="Custom C">Custom C</option>
+                </select>
               </div>
               {errors.jenisPaket && <p className="text-[11px] text-red-500 font-medium">{errors.jenisPaket}</p>}
               
@@ -176,32 +150,32 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
             {/* Vendor / WO */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-zinc-400">Vendor / WO</label>
-              <select
-                value={vendor}
-                onChange={(e) => setVendor(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none transition-colors"
-              >
-                <option value="Happylee">Happylee</option>
-                <option value="Chic Decor">Chic Decor</option>
-                <option value="Surya Wedding">Surya Wedding</option>
-                <option value="Larasati WO">Larasati WO</option>
-                <option value="Lainnya">Lainnya / Custom</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Supplier Vendor Custom input if 'Lainnya' selected */}
-          {vendor === "Lainnya" && (
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-zinc-400">Nama Custom Vendor</label>
               <input
                 type="text"
-                placeholder="Masukkan nama WO / Vendor"
+                value={vendor}
+                list="suggested-vendors"
                 onChange={(e) => setVendor(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none transition-colors"
+                placeholder="Masukkan nama WO / Vendor"
+                className={`w-full bg-zinc-950 border ${
+                  errors.vendor ? "border-red-500" : "border-zinc-800 focus:border-blue-500"
+                } rounded-xl px-4 py-3 text-sm text-zinc-200 outline-none transition-colors`}
               />
+              <datalist id="suggested-vendors">
+                {Array.from(
+                  new Set([
+                    "Happylee",
+                    "Chic Decor",
+                    "Surya Wedding",
+                    "Larasati WO",
+                    ...events.map((e) => e.vendor.trim()).filter((v) => v)
+                  ])
+                ).map((vendorName) => (
+                  <option key={vendorName} value={vendorName} />
+                ))}
+              </datalist>
+              {errors.vendor && <p className="text-[11px] text-red-500 font-medium">{errors.vendor}</p>}
             </div>
-          )}
+          </div>
 
           {/* Lokasi */}
           <div className="space-y-1">
