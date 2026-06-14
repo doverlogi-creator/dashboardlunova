@@ -6,7 +6,6 @@
 import { useState, useEffect } from "react";
 import {
   Activity,
-  Calendar,
   Cloud,
   CloudLightning,
   Coins,
@@ -39,16 +38,19 @@ import {
 
 import { EventData, CostSettings, AppsScriptConfig } from "./types";
 import { MOCK_EVENTS, DEFAULT_SETTINGS, getDashboardTotals, formatRupiah } from "./utils";
+import { translations } from "./translations";
 import StatCard from "./components/StatCard";
-import Charts from "./components/Charts";
+import Charts, { VendorPerformance } from "./components/Charts";
 import EventTable from "./components/EventTable";
+import MonthlySharing from "./components/MonthlySharing";
+import Calendar from "./components/Calendar";
 import AddEventModal from "./components/AddEventModal";
 import AppsScriptSetupModal from "./components/AppsScriptSetupModal";
 import InvoiceGenerator from "./components/InvoiceGenerator";
 
 export default function App() {
   // --- STATES ---
-  const [activeView, setActiveView] = useState<"dashboard" | "invoice" | "settings">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "mitra-kinerja" | "pembagian-bulan" | "invoice" | "settings">("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [events, setEvents] = useState<EventData[]>([]);
   const [settings, setSettings] = useState<CostSettings>(DEFAULT_SETTINGS);
@@ -59,6 +61,15 @@ export default function App() {
   });
 
   const [theme, setTheme] = useState<"light" | "dark" | "">("");
+  const [lang, setLang] = useState<"en" | "id">(() => {
+    const saved = localStorage.getItem("lighting_lang_2026");
+    return (saved === "en" || saved === "id") ? saved : "en"; // default to English
+  });
+
+  // --- LANGUAGE STORAGE SYNCHRONIZATION ---
+  useEffect(() => {
+    localStorage.setItem("lighting_lang_2026", lang);
+  }, [lang]);
 
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
@@ -66,10 +77,11 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // --- THEME INITIAL COUPLING ---
   useEffect(() => {
-    const savedTheme = localStorage.getItem("lighting_theme_2026") || "dark";
+    const savedTheme = localStorage.getItem("lighting_theme_2026") || "light";
     setTheme(savedTheme as "light" | "dark");
   }, []);
 
@@ -472,15 +484,16 @@ export default function App() {
 
   // --- METRICS CALCULATION ---
   const totals = getDashboardTotals(events, settings);
+  const t = translations[lang];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-blue-500/20 selection:text-blue-200 flex flex-col relative w-full overflow-x-hidden">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-blue-500/20 selection:text-blue-200 flex flex-col relative w-full overflow-x-clip">
       {/* Decorative Neon Lighting glow accents */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[300px] bg-purple-950/10 rounded-full blur-[150px] pointer-events-none" />
-      <div className="absolute top-10 right-1/4 w-[400px] h-[300px] bg-blue-950/10 rounded-full blur-[150px] pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[500px] h-[300px] bg-purple-950/10 rounded-full blur-[150px] pointer-events-none decorative-glow" />
+      <div className="absolute top-10 right-1/4 w-[400px] h-[300px] bg-blue-950/10 rounded-full blur-[150px] pointer-events-none decorative-glow" />
 
       {/* GLOBAL HEADER BAR (DESKTOP & MOBILE) */}
-      <div className="flex items-center justify-between p-4 bg-zinc-900 border-b border-zinc-800 z-40 sticky top-0 w-full shrink-0">
+      <div className="flex items-center justify-between p-4 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 z-[45] sticky top-0 w-full shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -493,14 +506,25 @@ export default function App() {
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
               <Zap className="w-5 h-5 fill-white/10 text-white" />
             </div>
-            <span className="font-extrabold text-sm tracking-tight text-white">
+            <span className="font-extrabold text-sm tracking-tight text-zinc-50">
               Lunova <span className="text-blue-500 font-bold">Lighting</span>
             </span>
           </div>
         </div>
 
-        {/* Right side controls (Theme Toggle + Database Status Alert) */}
+        {/* Right side controls (Theme Toggle + Language switch + Database Status Alert) */}
         <div className="flex items-center gap-3">
+          {/* Language Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setLang((prev) => (prev === "en" ? "id" : "en"))}
+            className="px-3 py-1.5 text-[11px] font-bold tracking-wider uppercase text-zinc-300 hover:text-white bg-zinc-950/40 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-1.5 outline-none font-mono"
+            title={lang === "en" ? "Switch to Indonesian" : "Ubah ke Bahasa Inggris"}
+          >
+            <span>🌐</span>
+            <span className="text-blue-500">{lang === "en" ? "EN" : "ID"}</span>
+          </button>
+
           {/* Theme Toggle Button */}
           <button
             type="button"
@@ -546,7 +570,7 @@ export default function App() {
               <Zap className="w-5 h-5 fill-white/10 text-white" />
             </div>
             <div>
-              <span className="font-extrabold text-sm tracking-tight text-white block">
+              <span className="font-extrabold text-sm tracking-tight text-zinc-50 block">
                 Lunova <span className="text-blue-500 font-bold">Lighting</span>
               </span>
               <span className="text-[9px] text-zinc-500 font-mono tracking-widest block uppercase -mt-0.5">
@@ -570,14 +594,43 @@ export default function App() {
               setActiveView("dashboard");
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 cursor-pointer ${
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
               activeView === "dashboard"
                 ? "bg-blue-600 text-white shadow"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            <span>📊 Dashboard Analisis</span>
+            <span>{t.navDashboard}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveView("mitra-kinerja");
+              setIsSidebarOpen(false);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
+              activeView === "mitra-kinerja"
+                ? "bg-purple-600 text-white shadow"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            }`}
+          >
+            <span>{t.navManageEvents}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveView("pembagian-bulan");
+              setIsSidebarOpen(false);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
+              activeView === "pembagian-bulan"
+                ? "bg-amber-600 text-white shadow"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            }`}
+          >
+            <span>{t.navProfitSharing}</span>
           </button>
 
           <button
@@ -586,14 +639,13 @@ export default function App() {
               setIsSidebarOpen(false);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 cursor-pointer ${
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
               activeView === "invoice"
                 ? "bg-emerald-600 text-white shadow"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             }`}
           >
-            <FileText className="w-4 h-4 shrink-0" />
-            <span>🧾 Transaksi & Invoice</span>
+            <span>{t.navInvoice}</span>
           </button>
 
           <button
@@ -602,14 +654,13 @@ export default function App() {
               setIsSidebarOpen(false);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all duration-150 cursor-pointer ${
+            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
               activeView === "settings"
                 ? "bg-zinc-850 text-blue-400 border border-zinc-700/50"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent"
             }`}
           >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span>⚙️ Pengaturan & Database</span>
+            <span>{t.navSettings}</span>
           </button>
         </nav>
 
@@ -656,16 +707,106 @@ export default function App() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="bg-blue-500/10 text-blue-400 border border-blue-500/15 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
-                    Partner Usaha
+                    {t.dashboardBadge}
                   </span>
-                  <span className="text-zinc-400 text-xs font-mono">• 2026 Season</span>
+                  <span className="text-zinc-400 text-xs font-mono">{t.season2026}</span>
                 </div>
                 <h1 className="text-3xl font-extrabold tracking-tight text-zinc-150 mt-1 flex items-center gap-2">
-                  <span>Dashboard Usaha Lighting</span>
+                  <span>{t.welcomePartner}</span>
                   <Sparkles className="w-6 h-6 text-blue-500 fill-blue-500/20 shrink-0 animate-pulse" />
                 </h1>
+                <p className="text-zinc-400 text-sm mt-1 max-w-2xl leading-relaxed font-mono">
+                  {new Intl.DateTimeFormat(lang === "en" ? "en-US" : "id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => {
+                    setActiveView("mitra-kinerja");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>{t.manageBtn}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* --- KPI STAT CARDS --- */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
+              <StatCard
+                id="kpi-pemasukan"
+                title={t.kpiGrossRevenue}
+                value={totals.totalRevenue}
+                icon={<Wallet className="w-5 h-5" />}
+                colorClass="text-blue-500"
+                description={t.kpiGrossRevenueDesc}
+                badgeText={`${totals.eventCount} ${t.kpiEventsCount}`}
+                badgeColorClass="bg-blue-500/10 text-blue-500 border-blue-500/20"
+              />
+
+              <StatCard
+                id="kpi-operational"
+                title={t.kpiAvgMonthlyNet}
+                value={totals.averageMonthlyNetProfit}
+                icon={<TrendingUp className="w-5 h-5" />}
+                colorClass="text-emerald-400"
+                description={t.kpiAvgMonthlyNetDesc}
+                badgeText={`${totals.uniqueMonthsCount} ${t.kpiMonthsCount}`}
+                badgeColorClass="bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              />
+
+              <StatCard
+                id="kpi-profit"
+                title={t.kpiTotalNetProfit}
+                value={totals.totalCashback}
+                icon={<Coins className="w-5 h-5" />}
+                colorClass="text-purple-400"
+                description={t.kpiTotalNetProfitDesc}
+                badgeText={t.kpiRemainingProfit}
+                badgeColorClass="bg-purple-500/10 text-purple-400 border-purple-500/20"
+              />
+
+              <StatCard
+                id="kpi-kas"
+                title={t.kpiOverhead}
+                value={totals.overheadCost}
+                icon={<Layers className="w-5 h-5" />}
+                colorClass="text-cyan-400"
+                description={t.kpiOverheadDesc}
+                badgeText="Row 7"
+                badgeColorClass="bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+              />
+            </div>
+
+            {/* --- GRAPHS SECTION (Bento Box Section 1) --- */}
+            <Charts events={events} settings={settings} lang={lang} />
+
+            {/* --- INTERACTIVE CALENDAR SCHEDULE REMINDER --- */}
+            <Calendar events={events} settings={settings} lang={lang} />
+          </>
+        )}
+
+        {activeView === "mitra-kinerja" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* View Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="bg-purple-500/10 text-purple-400 border border-purple-500/15 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
+                    {lang === "en" ? "Administration & Performance" : "Administrasi & Kinerja"}
+                  </span>
+                  <span className="text-zinc-400 text-xs font-mono">• {lang === "en" ? "Real-time Tracking" : "Pencatatan Real-time"}</span>
+                </div>
+                <h1 className="text-3xl font-extrabold tracking-tight text-zinc-150 mt-1 flex items-center gap-2">
+                  <span>{lang === "en" ? "Manage Events & Partner Performance" : "Kelola Event & Kinerja Mitra"}</span>
+                </h1>
                 <p className="text-zinc-400 text-sm mt-1 max-w-2xl leading-relaxed">
-                  Arus keuangan, biaya pemasangan, dan log bagi hasil dekorasi pencahayaan panggung wedding event antara <strong className="text-blue-400">Lunova Lighting</strong> dkk.
+                  {lang === "en" 
+                    ? "Track lighting rental transactions, analyze WO/vendor performance ranks, and manage historic logs." 
+                    : "Catat transaksi penyewaan lighting, analisis ranking performa mitra WO/vendor, dan kelola histori data secara lengkap."}
                 </p>
               </div>
 
@@ -675,7 +816,7 @@ export default function App() {
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-900 text-zinc-300 border border-zinc-800 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
                 >
                   <Sliders className="w-4 h-4" />
-                  <span>Ubah Parameter Biaya</span>
+                  <span>{t.editCostParamsBtn}</span>
                 </button>
 
                 <button
@@ -683,74 +824,36 @@ export default function App() {
                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
-                  <span>Tambah Transaksi</span>
+                  <span>{t.addEventBtn}</span>
                 </button>
               </div>
             </div>
 
-            {/* --- KPI STAT CARDS --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
-              <StatCard
-                id="kpi-pemasukan"
-                title="Omset Persewaan Kotor"
-                value={totals.totalRevenue}
-                icon={<Wallet className="w-5 h-5" />}
-                colorClass="text-blue-500"
-                description="Total pemasukan dari semua event"
-                badgeText={`${totals.eventCount} Acara`}
-                badgeColorClass="bg-blue-500/10 text-blue-500 border-blue-500/20"
-              />
+            {/* Vendor/WO Performance ranking */}
+            <VendorPerformance events={events} />
 
-              <StatCard
-                id="kpi-operational"
-                title="Pendapatan Bersih / Bulan"
-                value={totals.averageMonthlyNetProfit}
-                icon={<TrendingUp className="w-5 h-5" />}
-                colorClass="text-emerald-400"
-                description="Rata-rata profit bersih bulanan"
-                badgeText={`${totals.uniqueMonthsCount} Bulan`}
-                badgeColorClass="bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              />
+            {/* Log table */}
+            <EventTable events={events} settings={settings} onDeleteEvent={handleDeleteEvent} lang={lang} />
 
-              <StatCard
-                id="kpi-profit"
-                title="Total Keuntungan Bersih"
-                value={totals.totalNetProfit}
-                icon={<Coins className="w-5 h-5" />}
-                colorClass="text-purple-400"
-                description="Laba bersih dibagikan"
-                badgeText="Sisa Laba"
-                badgeColorClass="bg-purple-500/10 text-purple-400 border-purple-500/20"
-              />
-
-              <StatCard
-                id="kpi-kas"
-                title="Pengadaan Keluar"
-                value={totals.overheadCost}
-                icon={<Layers className="w-5 h-5" />}
-                colorClass="text-cyan-400"
-                description="Total investasi pengadaan keseluruhan"
-                badgeText="Row 7"
-                badgeColorClass="bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-              />
-            </div>
-
-            {/* --- GRAPHS SECTION (Bento Box Section 1) --- */}
-            <Charts events={events} settings={settings} />
-
-            {/* --- TRANSACTIONS LOG TABLE SECTION --- */}
-            <EventTable events={events} settings={settings} onDeleteEvent={handleDeleteEvent} />
-
-            {/* --- SYSTEM NOTION / FOOTER BAR --- */}
+            {/* Formula references card */}
             <div className="bg-zinc-900/40 p-6 rounded-2xl border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-sans">
               <div className="space-y-1">
                 <span className="font-bold text-zinc-300 flex items-center gap-1">
                   <Info className="w-4 h-4 text-blue-400" />
-                  Formula Keuangan Usaha Lighting 2026:
+                  {lang === "en" ? "Lighting Operations Formula 2026:" : "Formula Keuangan Usaha Lighting 2026:"}
                 </span>
                 <p className="text-zinc-400 leading-relaxed pl-5">
-                  Net Profit = Hasil Sewa - [Ops ({formatRupiah(settings.operasionalAcara)}) + Cashback ({formatRupiah(settings.cashback)} <span className="text-emerald-400 font-semibold">*khusus paket berakhiran 'C'*</span>)].<br />
-                  Selanjutnya pembagian laba bersih: Partner 1 ({settings.partner1Name}) mendapat {settings.partner1Share}%, Partner 2 ({settings.partner2Name}) mendapat {settings.partner2Share}%, Sisanya 20% masuk ke Kas Perusahaan yang diset ke akumulasi minus biaya procurement global ({formatRupiah(settings.pengadaanKeseluruhanKeluar)}).
+                  {lang === "en" ? (
+                    <>
+                      Net Profit = Gross Rent - [Ops ({formatRupiah(settings.operasionalAcara)}) + Cashback ({formatRupiah(settings.cashback)} <span className="text-emerald-400 font-semibold">*only package ending with 'C'*</span>)].<br />
+                      Dividends: Partner 1 ({settings.partner1Name}) gets {settings.partner1Share}%, Partner 2 ({settings.partner2Name}) gets {settings.partner2Share}%, Remaining 20% goes to the company savings fund accrued minus overall equipment investments ({formatRupiah(settings.pengadaanKeseluruhanKeluar)}).
+                    </>
+                  ) : (
+                    <>
+                      Net Profit = Hasil Sewa - [Ops ({formatRupiah(settings.operasionalAcara)}) + Cashback ({formatRupiah(settings.cashback)} <span className="text-emerald-400 font-semibold">*khusus paket berakhiran 'C'*</span>)].<br />
+                      Selanjutnya pembagian laba bersih: Partner 1 ({settings.partner1Name}) mendapat {settings.partner1Share}%, Partner 2 ({settings.partner2Name}) mendapat {settings.partner2Share}%, Sisanya 20% masuk ke Kas Perusahaan yang diset ke akumulasi minus biaya procurement global ({formatRupiah(settings.pengadaanKeseluruhanKeluar)}).
+                    </>
+                  )}
                 </p>
               </div>
               <div className="shrink-0 flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase">
@@ -758,7 +861,31 @@ export default function App() {
                 <span>Usaha Lighting Core v1.0</span>
               </div>
             </div>
-          </>
+          </div>
+        )}
+
+        {activeView === "pembagian-bulan" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* View Header */}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-500/10 text-amber-400 border border-amber-500/15 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
+                  {lang === "en" ? "Profit Sharing & Dividends" : "Bagi Hasil & Profit"}
+                </span>
+                <span className="text-zinc-400 text-xs font-mono">• {lang === "en" ? "Monthly Accrued Profit" : "Akumulasi Laba Bulanan"}</span>
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-zinc-150 mt-1 flex items-center gap-2">
+                <span>{t.monthlySharingTitle}</span>
+              </h1>
+              <p className="text-zinc-400 text-sm mt-1 max-w-2xl leading-relaxed font-sans">
+                {t.monthlySharingSub}
+              </p>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+              <MonthlySharing events={events} settings={settings} lang={lang} />
+            </div>
+          </div>
         )}
 
         {activeView === "invoice" && (
@@ -767,6 +894,7 @@ export default function App() {
               events={events}
               settings={settings}
               onBack={() => setActiveView("dashboard")}
+              lang={lang}
             />
           </div>
         )}
@@ -1001,13 +1129,7 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Baru: Operasional (Rp300k), Cashback (Rp100k), Karyawan (Rp250k), Bensin (Rp25k), Pengadaan (L9).")) {
-                      const nextSettings = { ...DEFAULT_SETTINGS };
-                      saveSettingsLocally(nextSettings);
-                      handleUpdateSettingsOnSheet(nextSettings);
-                    }
-                  }}
+                  onClick={() => setIsResetConfirmOpen(true)}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
@@ -1201,13 +1323,7 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm("Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Baru: Operasional (Rp300k), Cashback (Rp100k), Karyawan (Rp250k), Bensin (Rp25k), Pengadaan (L9).")) {
-                      const nextSettings = { ...DEFAULT_SETTINGS };
-                      saveSettingsLocally(nextSettings);
-                      handleUpdateSettingsOnSheet(nextSettings);
-                    }
-                  }}
+                  onClick={() => setIsResetConfirmOpen(true)}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0 animate-pulse"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
@@ -1223,6 +1339,44 @@ export default function App() {
                 className="px-5 py-2 hover:bg-zinc-800 hover:text-white active:scale-95 bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Selesai & Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isResetConfirmOpen && (
+        <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeIn">
+          <div className="absolute inset-0" onClick={() => setIsResetConfirmOpen(false)} />
+          <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col p-6 animate-scaleUp space-y-4">
+            <div className="flex items-center gap-3 text-blue-400">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-100 font-sans">Kembalikan ke Default</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+              Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Nilai saat ini akan ditimpa dengan nilai bawaan.
+            </p>
+            
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setIsResetConfirmOpen(false)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  const nextSettings = { ...DEFAULT_SETTINGS };
+                  saveSettingsLocally(nextSettings);
+                  handleUpdateSettingsOnSheet(nextSettings);
+                  setIsResetConfirmOpen(false);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              >
+                Setel Ulang
               </button>
             </div>
           </div>

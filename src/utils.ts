@@ -18,13 +18,20 @@ export function formatRupiah(amount: number): string {
 }
 
 /**
- * Convert Date standard string to Indonesian style date
+ * Convert Date standard string to localized styled date
  */
-export function formatDateIndo(dateStr: string): string {
+export function formatDateIndo(dateStr: string, lang: "en" | "id" = "id"): string {
   if (!dateStr) return "-";
   
   try {
     const d = parseDate(dateStr);
+    if (lang === "en") {
+      const months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      ];
+      return `${months[d.getMonth()]} ${d.getDate()}, ${ d.getFullYear()}`;
+    }
     const months = [
       "Januari", "Februari", "Maret", "April", "Mei", "Juni",
       "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -111,6 +118,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
   let totalP1Share = 0;
   let totalP2Share = 0;
   let totalKasShare = 0;
+  let totalCashback = 0;
   
   events.forEach((evt) => {
     const fin = getEventFinances(evt, settings);
@@ -120,6 +128,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
     totalP1Share += fin.p1Share;
     totalP2Share += fin.p2Share;
     totalKasShare += fin.kasShare;
+    totalCashback += fin.eventCashback;
   });
   
   // Group by distinct months to calculate monthly averages
@@ -158,7 +167,8 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
     totalKasShare,
     overheadCost,
     finalKas,
-    eventCount: events.length
+    eventCount: events.length,
+    totalCashback
   };
 }
 

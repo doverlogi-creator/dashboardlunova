@@ -14,14 +14,14 @@ export interface EventData {
 }
 
 export interface CostSettings {
-  operasionalAcara: number; // e.g. Rp 300.000
-  cashback: number; // e.g. Rp 100.000
-  karyawanAcara: number; // e.g. Rp 250.000
-  bensinAcara: number; // e.g. Rp 25.000
-  pengadaanKeseluruhanKeluar: number; // e.g. Rp 340.000 (overall procurement cost)
+  operasionalAcara: number; // raw number
+  cashback: number; // raw number
+  karyawanAcara: number; // raw number
+  bensinAcara: number; // raw number
+  pengadaanKeseluruhanKeluar: number; // raw number
   
   // Profit sharing
-  partner1Name: string; // "Lunova Lighting"
+  partner1Name: string; // "Neovan"
   partner1Share: number; // 40 (%)
   partner2Name: string; // "Surya"
   partner2Share: number; // 40 (%)
@@ -29,6 +29,6 @@ export interface CostSettings {
 
 export interface AppsScriptConfig {
   webAppUrl: string;
-  isDemoMode: boolean;
-  lastSyncedAt: string | null;
+  isDemoMode?: boolean;
+  lastSyncedAt?: string | null;
 }

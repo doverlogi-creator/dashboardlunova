@@ -106,11 +106,11 @@ function doGet(e) {
   
   // Ambil parameter biaya & mitra dari tabel di kolom H, I, J, K
   var settings = {
-    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()) || 300000,
-    cashback: parseRupiahValue(sheet.getRange("I3").getValue()) || 100000,
-    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()) || 250000,
-    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()) || 25000,
-    pengadaanKeseluruhanKeluar: parseRupiahValue(sheet.getRange("I7").getValue()) || 340000,
+    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()),
+    cashback: parseRupiahValue(sheet.getRange("I3").getValue()),
+    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()),
+    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()),
+    pengadaanKeseluruhanKeluar: parseRupiahValue(sheet.getRange("I7").getValue()),
     partner1Name: String(sheet.getRange("K9").getValue() || "Neovan").trim(),
     partner1Share: parsePercentageValue(sheet.getRange("J9").getValue(), 40),
     partner2Name: String(sheet.getRange("K10").getValue() || "Surya").trim(),
@@ -118,10 +118,14 @@ function doGet(e) {
   };
   
   return createJsonResponse({
-    data: data,
-    settings: settings,
-    lastUpdated: new Date().toISOString()
-  });
+  success: true,
+  data: data,
+  settings: settings,
+  lastUpdated: new Date().toISOString(),
+
+  isDemoMode: false,
+  lastSyncedAt: new Date().toISOString()
+});
 }
  
 function doPost(e) {

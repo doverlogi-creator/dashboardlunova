@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import { EventData, CostSettings } from "../types";
 import { formatRupiah, formatDateIndo } from "../utils";
+import { translations } from "../translations";
 
 interface InvoiceGeneratorProps {
   events: EventData[];
   settings: CostSettings;
   onBack: () => void;
+  lang?: "en" | "id";
 }
 
 interface InvoiceItem {
@@ -34,7 +36,7 @@ interface InvoiceItem {
   type: "Jasa" | "Rental";
 }
 
-export default function InvoiceGenerator({ events, settings, onBack }: InvoiceGeneratorProps) {
+export default function InvoiceGenerator({ events, settings, onBack, lang = "en" }: InvoiceGeneratorProps) {
   // --- STATE FOR SELECTED EVENT ---
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -857,7 +859,7 @@ export default function InvoiceGenerator({ events, settings, onBack }: InvoiceGe
                     <div className="space-y-0.5">
                       <span className="font-bold text-zinc-950">Tanggal :</span>
                       <div className="bg-zinc-50 border border-zinc-200 rounded px-2 py-1 flex items-center justify-between text-zinc-900 min-h-[24px]">
-                        <span className="font-mono font-semibold">{eventDate || formatDateIndo(invoiceDate)}</span>
+                        <span className="font-mono font-semibold">{eventDate || formatDateIndo(invoiceDate, lang)}</span>
                         <span className="text-[8px] text-zinc-400">▼</span>
                       </div>
                     </div>
