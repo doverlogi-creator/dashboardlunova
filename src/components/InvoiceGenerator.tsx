@@ -757,6 +757,16 @@ export default function InvoiceGenerator({ events, settings, onBack }: InvoiceGe
 
         {/* RIGHT COLUMN: PREVIEW ASPECT A5 PAPER */}
         <div className="lg:col-span-7 flex flex-col items-center w-full overflow-hidden">
+        <div className="w-full flex justify-end mb-4 pr-2">
+            <button
+              onClick={() => window.print()}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-md"
+            >
+              {/* Jika kamu pakai Lucide React Icons, bisa pakai <Printer className="w-4 h-4" /> */}
+              <span>Cetak PDF (Kertas A5)</span>
+            </button>
+          </div>
+          {/* ========================================= */}
           <span className="text-xs text-zinc-500 mb-2 block font-mono text-center">
             Preview Simulasi Kertas A5 (Fidelitas Cetak)
           </span>
