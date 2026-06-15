@@ -11,6 +11,12 @@ export interface EventData {
   lokasi: string; // e.g. "Gg. 11 Mekarsari"
   noHp: string; // e.g. "082213589994"
   pemasukan: number; // raw number
+  
+  // Custom overrides per event (optional)
+  operasionalAcara?: number;
+  cashback?: number;
+  karyawanAcara?: number;
+  bensinAcara?: number;
 }
 
 export interface CostSettings {

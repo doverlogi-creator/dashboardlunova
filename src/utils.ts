@@ -79,12 +79,16 @@ export function parseDate(dateStr: string | Date): Date {
  * Get financial breakdown (Operating Cost, Partner Shares, Kas) for a list of events or a single event
  */
 export function getEventFinances(event: EventData, settings: CostSettings) {
-  const customOperational = settings.operasionalAcara;
+  // Use event-specific override if present, otherwise fall back to global settings
+  const customOperational = event.operasionalAcara !== undefined ? event.operasionalAcara : settings.operasionalAcara;
+  const customKaryawan = event.karyawanAcara !== undefined ? event.karyawanAcara : settings.karyawanAcara;
+  const customBensin = event.bensinAcara !== undefined ? event.bensinAcara : settings.bensinAcara;
   
   // Package cashback only applies if the package name ends with 'C' (case-insensitive)
   const packageType = (event.jenisPaket || "").trim();
   const hasCAtEnd = packageType.endsWith("C") || packageType.endsWith("c");
-  const cashback = hasCAtEnd ? settings.cashback : 0;
+  const cashbackSetting = event.cashback !== undefined ? event.cashback : settings.cashback;
+  const cashback = hasCAtEnd ? cashbackSetting : 0;
   
   const runningCost = customOperational + cashback;
   const revenue = event.pemasukan;
@@ -97,6 +101,9 @@ export function getEventFinances(event: EventData, settings: CostSettings) {
   const p2Share = netProfit * (settings.partner2Share / 100);
   const kasShare = netProfit - (p1Share + p2Share);
   
+  // Sisa Operasional = operasional acara - karyawan/acara - bensin/acara
+  const sisaOperasional = customOperational - customKaryawan - customBensin;
+  
   return {
     revenue,
     runningCost,
@@ -104,7 +111,8 @@ export function getEventFinances(event: EventData, settings: CostSettings) {
     p1Share,
     p2Share,
     kasShare,
-    eventCashback: cashback
+    eventCashback: cashback,
+    sisaOperasional
   };
 }
 
@@ -119,6 +127,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
   let totalP2Share = 0;
   let totalKasShare = 0;
   let totalCashback = 0;
+  let totalSisaOperasional = 0;
   
   events.forEach((evt) => {
     const fin = getEventFinances(evt, settings);
@@ -129,6 +138,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
     totalP2Share += fin.p2Share;
     totalKasShare += fin.kasShare;
     totalCashback += fin.eventCashback;
+    totalSisaOperasional += fin.sisaOperasional;
   });
   
   // Group by distinct months to calculate monthly averages
@@ -154,7 +164,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
   
   // General procurement is subtracted from the Kas/Enterprise pool or listed as an overhead cost
   const overheadCost = settings.pengadaanKeseluruhanKeluar;
-  const finalKas = totalKasShare - overheadCost;
+  const finalKas = totalSisaOperasional;
   
   return {
     totalRevenue,
@@ -167,6 +177,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
     totalKasShare,
     overheadCost,
     finalKas,
+    totalSisaOperasional,
     eventCount: events.length,
     totalCashback
   };

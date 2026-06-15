@@ -22,8 +22,8 @@ export const translations = {
     kpiMonthsCount: "Months",
     kpiTotalNetProfit: "Total Cashback",
     kpiTotalNetProfitDesc: "Total cashback recorded from package events",
-    kpiOverhead: "Enterprise Procurement",
-    kpiOverheadDesc: "Total overall equipment investments",
+    kpiOverhead: "Remaining Operational",
+    kpiOverheadDesc: "Remaining operational balance after general procurement",
     kpiRemainingProfit: "Total Cashback",
 
     // Common / Notifications
@@ -186,8 +186,8 @@ export const translations = {
     kpiMonthsCount: "Bulan",
     kpiTotalNetProfit: "Total Cashback",
     kpiTotalNetProfitDesc: "Dihitung dari jumlah total cashback yang telah tercatat",
-    kpiOverhead: "Pengadaan Keluar",
-    kpiOverheadDesc: "Total investasi pengadaan keseluruhan",
+    kpiOverhead: "Sisa Operasional",
+    kpiOverheadDesc: "Sisa dana operasional setelah dikurangi pengadaan",
     kpiRemainingProfit: "Total Cashback",
 
     // Common / Notifications

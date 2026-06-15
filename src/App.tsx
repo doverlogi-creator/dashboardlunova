@@ -73,6 +73,7 @@ export default function App() {
 
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
+  const [editingCostEvent, setEditingCostEvent] = useState<EventData | null>(null);
   const [isSetupGasOpen, setIsSetupGasOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -212,6 +213,20 @@ export default function App() {
     localStorage.setItem("lighting_settings_2026", JSON.stringify(newSettings));
   };
 
+  const updateSpecificEventCost = (field: keyof EventData, value: number) => {
+    if (!editingCostEvent) return;
+    const updatedEv = { ...editingCostEvent, [field]: value };
+    setEditingCostEvent(updatedEv);
+    
+    const updatedEvents = events.map((ev) => {
+      if (ev.id === editingCostEvent.id) {
+        return updatedEv;
+      }
+      return ev;
+    });
+    saveEventsLocally(updatedEvents);
+  };
+
   const saveGasConfigLocally = (newConfig: AppsScriptConfig) => {
     setAppsScriptConfig(newConfig);
     localStorage.setItem("lighting_gas_config_2026", JSON.stringify(newConfig));
@@ -239,8 +254,21 @@ export default function App() {
 
       const rawJson = await res.json();
       if (rawJson && Array.isArray(rawJson.data)) {
-        // Save events retrieved from sheet
-        saveEventsLocally(rawJson.data);
+        // Save events retrieved from sheet, merging existing overrides from current memory state
+        const mergedData = rawJson.data.map((syncEvt: any) => {
+          const localEvt = events.find((le) => le.id === syncEvt.id);
+          if (localEvt) {
+            return {
+              ...syncEvt,
+              operasionalAcara: localEvt.operasionalAcara,
+              cashback: localEvt.cashback,
+              karyawanAcara: localEvt.karyawanAcara,
+              bensinAcara: localEvt.bensinAcara,
+            };
+          }
+          return syncEvt;
+        });
+        saveEventsLocally(mergedData);
 
         // Save settings retrieved from sheet if present and make Google Sheets the absolute sole source of truth with fallback to current state if empty
         if (rawJson.settings) {
@@ -772,11 +800,11 @@ export default function App() {
               <StatCard
                 id="kpi-kas"
                 title={t.kpiOverhead}
-                value={totals.overheadCost}
+                value={totals.finalKas}
                 icon={<Layers className="w-5 h-5" />}
                 colorClass="text-cyan-400"
                 description={t.kpiOverheadDesc}
-                badgeText="Row 7"
+                badgeText="Kas"
                 badgeColorClass="bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
               />
             </div>
@@ -812,14 +840,6 @@ export default function App() {
 
               <div className="flex items-center gap-3 shrink-0">
                 <button
-                  onClick={() => setIsCostModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-zinc-900 text-zinc-300 border border-zinc-800 hover:border-zinc-700 hover:text-white transition-all cursor-pointer"
-                >
-                  <Sliders className="w-4 h-4" />
-                  <span>{t.editCostParamsBtn}</span>
-                </button>
-
-                <button
                   onClick={() => setIsAddEventOpen(true)}
                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer"
                 >
@@ -833,7 +853,16 @@ export default function App() {
             <VendorPerformance events={events} />
 
             {/* Log table */}
-            <EventTable events={events} settings={settings} onDeleteEvent={handleDeleteEvent} lang={lang} />
+            <EventTable
+              events={events}
+              settings={settings}
+              onDeleteEvent={handleDeleteEvent}
+              onEditCosts={(evt) => {
+                setEditingCostEvent(evt);
+                setIsCostModalOpen(true);
+              }}
+              lang={lang}
+            />
 
             {/* Formula references card */}
             <div className="bg-zinc-900/40 p-6 rounded-2xl border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-sans">
@@ -990,153 +1019,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Cost Configuration Panel */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
-              {/* Standard Costs */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
-                  <span>Biaya Tetap Per Event</span>
-                  <span className="text-[10px] text-blue-400 font-mono">Row 2 & 3</span>
-                </h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                      Operasional / Acara (I2)
-                    </label>
-                    <input
-                      type="number"
-                      value={settings.operasionalAcara}
-                      onChange={(e) => saveSettingsLocally({ ...settings, operasionalAcara: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                      Cashback Vendor (I3)
-                    </label>
-                    <input
-                      type="number"
-                      value={settings.cashback}
-                      onChange={(e) => saveSettingsLocally({ ...settings, cashback: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {/* Field workers and gas */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
-                  <span>Tenaga Kerja & Bensin</span>
-                  <span className="text-[10px] text-blue-400 font-mono">Row 5 & 6</span>
-                </h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                      Karyawan / Acara (I5)
-                    </label>
-                    <input
-                      type="number"
-                      value={settings.karyawanAcara}
-                      onChange={(e) => saveSettingsLocally({ ...settings, karyawanAcara: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">
-                      Bensin / Acara (I6)
-                    </label>
-                    <input
-                      type="number"
-                      value={settings.bensinAcara}
-                      onChange={(e) => saveSettingsLocally({ ...settings, bensinAcara: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Profit Sharing Partners */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
-                  <span>Mitra & Pengadaan</span>
-                  <span className="text-[10px] text-blue-400 font-mono">Row 7</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 1</label>
-                    <input
-                      type="text"
-                      value={settings.partner1Name}
-                      onChange={(e) => saveSettingsLocally({ ...settings, partner1Name: e.target.value })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
-                    <input
-                      type="number"
-                      value={settings.partner1Share}
-                      onChange={(e) => saveSettingsLocally({ ...settings, partner1Share: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 2</label>
-                    <input
-                      type="text"
-                      value={settings.partner2Name}
-                      onChange={(e) => saveSettingsLocally({ ...settings, partner2Name: e.target.value })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
-                    <input
-                      type="number"
-                      value={settings.partner2Share}
-                      onChange={(e) => saveSettingsLocally({ ...settings, partner2Share: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Pengadaan Keseluruhan Keluar (I7)</label>
-                  <input
-                    type="number"
-                    value={settings.pengadaanKeseluruhanKeluar}
-                    onChange={(e) => saveSettingsLocally({ ...settings, pengadaanKeseluruhanKeluar: Number(e.target.value) })}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Reset Option Footer */}
-              <div className="col-span-1 md:col-span-3 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-zinc-800/60 pt-4 mt-2">
-                <div className="text-xs text-zinc-400 font-sans">
-                  {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl ? (
-                    <span className="flex items-center gap-1.5 text-blue-400 font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      Parameter disimpan lokal di website. Klik tombol "Gores Sinkron" untuk menyelaraskan ke Google Sheets.
-                    </span>
-                  ) : (
-                    <span className="text-zinc-500">
-                      Mode Simulasi Aktif.
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsResetConfirmOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Kembalikan ke Parameter Default</span>
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1164,18 +1047,27 @@ export default function App() {
       {/* --- COST SETTINGS MODAL (POP-UP ON DASHBOARD) --- */}
       {isCostModalOpen && (
         <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             {/* Header */}
             <div className="px-6 py-4 border-b border-zinc-800/80 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Sliders className="w-5 h-5 text-blue-500" />
                 <div>
-                  <h3 className="text-lg font-semibold text-zinc-100">Ubah Parameter Biaya Usaha</h3>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Konfigurasi operasional, gaji, bensin, dan bagi hasil mitra</p>
+                  <h3 className="text-lg font-semibold text-zinc-100">
+                    {editingCostEvent ? `Ubah Parameter Biaya: ${editingCostEvent.vendor}` : "Ubah Parameter Biaya Usaha"}
+                  </h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    {editingCostEvent 
+                      ? `Mengatur parameter biaya khusus untuk acara tanggal ${editingCostEvent.tanggal}` 
+                      : "Konfigurasi operasional, gaji, bensin, dan bagi hasil mitra"}
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => setIsCostModalOpen(false)}
+                onClick={() => {
+                  setIsCostModalOpen(false);
+                  setEditingCostEvent(null);
+                }}
                 className="p-1 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1184,7 +1076,7 @@ export default function App() {
 
             {/* Inputs Form Body */}
             <div className="p-6 space-y-6 overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Standard Costs */}
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
@@ -1198,8 +1090,15 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={settings.operasionalAcara}
-                        onChange={(e) => saveSettingsLocally({ ...settings, operasionalAcara: Number(e.target.value) })}
+                        value={editingCostEvent ? (editingCostEvent.operasionalAcara !== undefined ? editingCostEvent.operasionalAcara : settings.operasionalAcara) : settings.operasionalAcara}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (editingCostEvent) {
+                            updateSpecificEventCost("operasionalAcara", val);
+                          } else {
+                            saveSettingsLocally({ ...settings, operasionalAcara: val });
+                          }
+                        }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
                       />
                     </div>
@@ -1209,8 +1108,15 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={settings.cashback}
-                        onChange={(e) => saveSettingsLocally({ ...settings, cashback: Number(e.target.value) })}
+                        value={editingCostEvent ? (editingCostEvent.cashback !== undefined ? editingCostEvent.cashback : settings.cashback) : settings.cashback}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (editingCostEvent) {
+                            updateSpecificEventCost("cashback", val);
+                          } else {
+                            saveSettingsLocally({ ...settings, cashback: val });
+                          }
+                        }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
                       />
                     </div>
@@ -1230,8 +1136,15 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={settings.karyawanAcara}
-                        onChange={(e) => saveSettingsLocally({ ...settings, karyawanAcara: Number(e.target.value) })}
+                        value={editingCostEvent ? (editingCostEvent.karyawanAcara !== undefined ? editingCostEvent.karyawanAcara : settings.karyawanAcara) : settings.karyawanAcara}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (editingCostEvent) {
+                            updateSpecificEventCost("karyawanAcara", val);
+                          } else {
+                            saveSettingsLocally({ ...settings, karyawanAcara: val });
+                          }
+                        }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
                       />
                     </div>
@@ -1241,68 +1154,18 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={settings.bensinAcara}
-                        onChange={(e) => saveSettingsLocally({ ...settings, bensinAcara: Number(e.target.value) })}
+                        value={editingCostEvent ? (editingCostEvent.bensinAcara !== undefined ? editingCostEvent.bensinAcara : settings.bensinAcara) : settings.bensinAcara}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (editingCostEvent) {
+                            updateSpecificEventCost("bensinAcara", val);
+                          } else {
+                            saveSettingsLocally({ ...settings, bensinAcara: val });
+                          }
+                        }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* Profit Sharing Partners */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-2 flex items-center justify-between">
-                    <span>Mitra & Pengadaan</span>
-                    <span className="text-[10px] text-blue-400 font-mono">Row 7</span>
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 1</label>
-                      <input
-                        type="text"
-                        value={settings.partner1Name}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner1Name: e.target.value })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
-                      <input
-                        type="number"
-                        value={settings.partner1Share}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner1Share: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Partner 2</label>
-                      <input
-                        type="text"
-                        value={settings.partner2Name}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner2Name: e.target.value })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Bagi Hasil %</label>
-                      <input
-                        type="number"
-                        value={settings.partner2Share}
-                        onChange={(e) => saveSettingsLocally({ ...settings, partner2Share: Number(e.target.value) })}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Pengadaan Keseluruhan Keluar (I7)</label>
-                    <input
-                      type="number"
-                      value={settings.pengadaanKeseluruhanKeluar}
-                      onChange={(e) => saveSettingsLocally({ ...settings, pengadaanKeseluruhanKeluar: Number(e.target.value) })}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
-                    />
                   </div>
                 </div>
               </div>
@@ -1310,7 +1173,11 @@ export default function App() {
               {/* Reset Option Footer */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-zinc-800/60 pt-4 mt-2">
                 <div className="text-xs text-zinc-400 font-sans">
-                  {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl ? (
+                  {editingCostEvent ? (
+                    <span className="text-zinc-400">
+                      Mengubah biaya untuk baris ini saja. Set parameters kustom Anda di atas.
+                    </span>
+                  ) : !appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl ? (
                     <span className="flex items-center gap-1.5 text-blue-400 font-medium">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                       Parameter disimpan lokal di website. Klik tombol "Gores Sinkron" untuk menyelaraskan ke Google Sheets.
@@ -1324,10 +1191,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsResetConfirmOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0 animate-pulse"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Kembalikan ke Parameter Default</span>
+                  <span>
+                    {editingCostEvent ? "Hapus Kustomisasi (Ikut Biaya Global)" : "Kembalikan ke Parameter Default"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -1335,7 +1204,10 @@ export default function App() {
             {/* Footer */}
             <div className="px-6 py-4 bg-zinc-950 border-t border-zinc-800/60 flex justify-end">
               <button
-                onClick={() => setIsCostModalOpen(false)}
+                onClick={() => {
+                  setIsCostModalOpen(false);
+                  setEditingCostEvent(null);
+                }}
                 className="px-5 py-2 hover:bg-zinc-800 hover:text-white active:scale-95 bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Selesai & Tutup
@@ -1353,11 +1225,15 @@ export default function App() {
               <div className="p-2 bg-blue-500/10 rounded-lg">
                 <RefreshCw className="w-5 h-5" />
               </div>
-              <h3 className="text-sm font-bold text-zinc-100 font-sans">Kembalikan ke Default</h3>
+              <h3 className="text-sm font-bold text-zinc-100 font-sans">
+                {editingCostEvent ? "Hapus Kustomisasi" : "Kembalikan ke Default"}
+              </h3>
             </div>
             
             <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-              Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Nilai saat ini akan ditimpa dengan nilai bawaan.
+              {editingCostEvent 
+                ? "Apakah Anda yakin ingin menghapus semua parameter kustomisasi biaya untuk event ini dan mengembalikan ke parameter bisnis global?"
+                : "Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Nilai saat ini akan ditimpa dengan nilai bawaan."}
             </p>
             
             <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -1369,9 +1245,26 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  const nextSettings = { ...DEFAULT_SETTINGS };
-                  saveSettingsLocally(nextSettings);
-                  handleUpdateSettingsOnSheet(nextSettings);
+                  if (editingCostEvent) {
+                    const updatedEvents = events.map((ev) => {
+                      if (ev.id === editingCostEvent.id) {
+                        const updatedEv = { ...ev };
+                        delete updatedEv.operasionalAcara;
+                        delete updatedEv.cashback;
+                        delete updatedEv.karyawanAcara;
+                        delete updatedEv.bensinAcara;
+                        return updatedEv;
+                      }
+                      return ev;
+                    });
+                    saveEventsLocally(updatedEvents);
+                    setEditingCostEvent(null);
+                    setIsCostModalOpen(false);
+                  } else {
+                    const nextSettings = { ...DEFAULT_SETTINGS };
+                    saveSettingsLocally(nextSettings);
+                    handleUpdateSettingsOnSheet(nextSettings);
+                  }
                   setIsResetConfirmOpen(false);
                 }}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"

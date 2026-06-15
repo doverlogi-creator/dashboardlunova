@@ -23,6 +23,8 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const isPresetPackage = ["Paket 1", "Paket 1 C", "Paket 2", "Paket 2 C", "Paket 3", "Paket 3 C"].includes(jenisPaket);
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!tanggal) newErrors.tanggal = "Tanggal wajib diisi";
@@ -226,11 +228,19 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
                 value={pemasukan}
                 onChange={(e) => setPemasukan(e.target.value)}
                 placeholder="750000"
-                className={`w-full bg-zinc-950 border ${
-                  errors.pemasukan ? "border-red-500" : "border-zinc-800 focus:border-blue-500"
-                } rounded-xl pl-10 pr-4 py-3 text-sm text-zinc-200 outline-none transition-colors font-mono`}
+                disabled={isPresetPackage}
+                className={`w-full ${
+                  isPresetPackage ? "bg-zinc-900/60 text-zinc-400 cursor-not-allowed border-zinc-805" : "bg-zinc-950 text-zinc-200 border-zinc-800 focus:border-blue-500"
+                } border ${
+                  errors.pemasukan ? "border-red-500" : ""
+                } rounded-xl pl-10 pr-4 py-3 text-sm outline-none transition-colors font-mono`}
               />
             </div>
+            {isPresetPackage && (
+              <p className="text-[10px] text-zinc-500 font-mono italic mt-0.5">
+                * Nominal dikunci khusus paket standar sesuai kriteria nominal yang berlaku
+              </p>
+            )}
             {errors.pemasukan && <p className="text-[11px] text-red-500 font-medium">{errors.pemasukan}</p>}
           </div>
 

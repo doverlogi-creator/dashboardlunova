@@ -7,7 +7,7 @@ import { useState } from "react";
 import { formatRupiah, formatDateIndo, parseDate } from "../utils";
 import { EventData, CostSettings } from "../types";
 import { getEventFinances } from "../utils";
-import { Search, Calendar, Phone, MapPin, Tag, Briefcase, Trash2, Eye, X } from "lucide-react";
+import { Search, Calendar, Phone, MapPin, Tag, Briefcase, Trash2, Eye, X, Sliders } from "lucide-react";
 
 import { translations } from "../translations";
 
@@ -16,9 +16,10 @@ interface EventTableProps {
   settings: CostSettings;
   onDeleteEvent?: (id: string) => void;
   lang?: "en" | "id";
+  onEditCosts?: (evt: EventData) => void;
 }
 
-export default function EventTable({ events, settings, onDeleteEvent, lang = "en" }: EventTableProps) {
+export default function EventTable({ events, settings, onDeleteEvent, lang = "en", onEditCosts }: EventTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVendor, setSelectedVendor] = useState("all");
   const [selectedPackage, setSelectedPackage] = useState("all");
@@ -181,6 +182,16 @@ export default function EventTable({ events, settings, onDeleteEvent, lang = "en
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {onEditCosts && (
+                          <button
+                            type="button"
+                            onClick={() => onEditCosts(evt)}
+                            className="p-1 rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-blue-400 transition-colors"
+                            title={t.editCostParamsBtn}
+                          >
+                            <Sliders className="w-4 h-4" />
+                          </button>
+                        )}
                         {onDeleteEvent && (
                           <button
                             onClick={() => setDeleteConfirmId(evt.id)}
@@ -307,7 +318,7 @@ export default function EventTable({ events, settings, onDeleteEvent, lang = "en
                     <div className="space-y-2 mt-3 text-xs font-mono">
                       <div className="flex justify-between text-zinc-400">
                         <span>{lang === "en" ? "Event Logistics:" : "Operasional Acara:"}</span>
-                        <span className="text-zinc-200">{formatRupiah(settings.operasionalAcara)}</span>
+                        <span className="text-zinc-200">{formatRupiah(selectedDetailEvent.operasionalAcara ?? settings.operasionalAcara)}</span>
                       </div>
                       <div className="flex justify-between text-zinc-400 items-center">
                         <span>{lang === "en" ? "Event WO Cashback:" : "Cashback Paket:"}</span>
@@ -326,11 +337,11 @@ export default function EventTable({ events, settings, onDeleteEvent, lang = "en
                       </div>
                       <div className="flex justify-between text-zinc-400">
                         <span>{lang === "en" ? "Estimated Crew Salary:" : "Karyawan Acara:"}</span>
-                        <span className="text-zinc-250">{formatRupiah(settings.karyawanAcara)}</span>
+                        <span className="text-zinc-250">{formatRupiah(selectedDetailEvent.karyawanAcara ?? settings.karyawanAcara)}</span>
                       </div>
                       <div className="flex justify-between text-zinc-400">
                         <span>{lang === "en" ? "Transport Gasoline:" : "Bensin Acara:"}</span>
-                        <span className="text-zinc-250">{formatRupiah(settings.bensinAcara)}</span>
+                        <span className="text-zinc-250">{formatRupiah(selectedDetailEvent.bensinAcara ?? settings.bensinAcara)}</span>
                       </div>
                       <div className="flex justify-between font-bold text-zinc-200 pt-2 border-t border-zinc-800/80">
                         <span>{lang === "en" ? "Total Expenditure:" : "Total Pengeluaran:"}</span>
