@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { EventData, CostSettings } from "../types";
 import { parseDate, formatDateIndo, formatRupiah } from "../utils";
 import { translations } from "../translations";
@@ -17,14 +17,57 @@ interface CalendarProps {
   events: EventData[];
   settings: CostSettings;
   lang?: "en" | "id";
+  selectedYear?: string;
 }
 
-export default function Calendar({ events, settings, lang = "en" }: CalendarProps) {
+export default function Calendar({ events, settings, lang = "en", selectedYear }: CalendarProps) {
   const currentRealDate = new Date();
   
-  // Start view on June 2026 (or default to current year 2026 which matches mock events)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(5); // June is 5 (0-indexed)
+  // Start view on today's month/year (or check the latest event if any)
+  const [currentYear, setCurrentYear] = useState(() => {
+    if (events.length > 0) {
+      let latest: Date | null = null;
+      events.forEach((evt) => {
+        if (!evt.tanggal) return;
+        const d = parseDate(evt.tanggal);
+        if (!isNaN(d.getTime())) {
+          if (!latest || d.getTime() > latest.getTime()) {
+            latest = d;
+          }
+        }
+      });
+      if (latest) return (latest as Date).getFullYear();
+    }
+    return new Date().getFullYear();
+  });
+
+  // Sync calendar's active view year on dashboard prop changes
+  useEffect(() => {
+    if (selectedYear && selectedYear !== "all") {
+      const yearNum = Number(selectedYear);
+      if (!isNaN(yearNum) && currentYear !== yearNum) {
+        setCurrentYear(yearNum);
+      }
+    }
+  }, [selectedYear]);
+
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (events.length > 0) {
+      let latest: Date | null = null;
+      events.forEach((evt) => {
+        if (!evt.tanggal) return;
+        const d = parseDate(evt.tanggal);
+        if (!isNaN(d.getTime())) {
+          if (!latest || d.getTime() > latest.getTime()) {
+            latest = d;
+          }
+        }
+      });
+      if (latest) return (latest as Date).getMonth();
+    }
+    return new Date().getMonth();
+  });
+
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const monthsEN = [
@@ -109,11 +152,12 @@ export default function Calendar({ events, settings, lang = "en" }: CalendarProp
   const blankDays = Array(startDayIndex).fill(null);
   const actualDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Quick jump back to 2026/current real month
+  // Quick jump back to current real month
   const jumpToToday = () => {
-    setCurrentYear(2026);
-    setCurrentMonth(5); // June
-    setSelectedDay(null);
+    const today = new Date();
+    setCurrentYear(today.getFullYear());
+    setCurrentMonth(today.getMonth());
+    setSelectedDay(today.getDate());
   };
 
   const t = translations[lang];
@@ -338,7 +382,7 @@ export default function Calendar({ events, settings, lang = "en" }: CalendarProp
 
           <div className="border-t border-zinc-900/80 pt-3 mt-3 text-center">
             <span className="text-[9px] text-zinc-500 font-semibold font-mono block">
-              Lighting Setup Dashboard • 2026
+              Lighting Setup Dashboard • {new Date().getFullYear()}
             </span>
           </div>
         </div>

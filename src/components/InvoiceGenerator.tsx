@@ -590,7 +590,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                   type="text"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  placeholder="e.g. 23 Juni 2026"
+                  placeholder={`e.g. 23 Juni ${new Date().getFullYear()}`}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-emerald-500 font-mono"
                 />
               </div>

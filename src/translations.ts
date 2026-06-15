@@ -12,7 +12,7 @@ export const translations = {
     // Dashboard General
     dashboardBadge: "Dashboard",
     welcomePartner: "Welcome Partner",
-    season2026: "• 2026 Season",
+    season2026: "• Active Live Season",
     manageBtn: "Manage Transactions & Partners",
     kpiGrossRevenue: "Total Revenue",
     kpiGrossRevenueDesc: "Total income from all events",
@@ -45,7 +45,7 @@ export const translations = {
 
     // Charts component
     chartRevenueTitle: "Profit & Gross Revenue Chart",
-    chartRevenueSub: "Interactive cumulative view of active 2026 lighting revenue, operasional and clean target profit.",
+    chartRevenueSub: "Interactive cumulative view of active lighting revenue, operasional and clean target profit.",
     chartContributionTitle: "Partner & Cash Contribution Distribution",
     chartContributionSub: "Interactive view of total clean net profit divided into partner shares and target enterprise savings.",
     chartPerformanceTitle: "Vendor / Wedding Organizer Rank Performance",
@@ -62,8 +62,8 @@ export const translations = {
 
     // Calendar component
     calendarTitle: "Event Schedule Calendar",
-    calendarSub: "Schedule reminder for lighting rentals & wedding organizer agreements 2026.",
-    resetToToday: "Reset (Jun '26)",
+    calendarSub: "Schedule reminder for lighting rentals & wedding organizer agreements.",
+    resetToToday: "Reset to Current Month",
     selectedDayDetails: "Selected Day Details",
     noEventsToday: "No events scheduled for this day.",
     selectCalendarDay: "Select a date in the calendar to view full lighting transaction details.",
@@ -176,7 +176,7 @@ export const translations = {
     // Dashboard General
     dashboardBadge: "Dashboard",
     welcomePartner: "Welcome Partner",
-    season2026: "• 2026 Season",
+    season2026: "• Musim Berjalan Aktif",
     manageBtn: "Kelola Transaksi & Mitra",
     kpiGrossRevenue: "Total Pemasukan",
     kpiGrossRevenueDesc: "Total pemasukan dari semua event",
@@ -209,7 +209,7 @@ export const translations = {
 
     // Charts component
     chartRevenueTitle: "Grafik Laba & Omset Bersih",
-    chartRevenueSub: "Pandangan kumulatif interaktif dari omset sewa lighting 2026 yang aktif, biaya operasional, dan laba target bersih.",
+    chartRevenueSub: "Pandangan kumulatif interaktif dari omset sewa lighting yang aktif, biaya operasional, dan laba target bersih.",
     chartContributionTitle: "Distribusi & Kontribusi Mitra Kerja",
     chartContributionSub: "Pandangan interaktif total pembagian keuntungan bersih ke porsi rekanan serta dana simpanan kas usaha.",
     chartPerformanceTitle: "Ranking Performa Vendor / WO",
@@ -226,8 +226,8 @@ export const translations = {
 
     // Calendar component
     calendarTitle: "Kalender Jadwal Event",
-    calendarSub: "Pengingat jadwal persewaan lighting & penandatanganan WO 2026.",
-    resetToToday: "Reset (Jun '26)",
+    calendarSub: "Pengingat jadwal persewaan lighting & penandatanganan WO.",
+    resetToToday: "Reset ke Bulan Sekarang",
     selectedDayDetails: "Detail Acara Terpilih",
     noEventsToday: "Tidak ada acara penjadwalan di tanggal ini.",
     selectCalendarDay: "Pilih tanggal kalender untuk melihat detail rincian event persewaan.",
@@ -259,7 +259,7 @@ export const translations = {
 
     // Monthly Sharing View
     monthlySharingTitle: "Laba Bersih & Margin Bagi Hasil",
-    monthlySharingSub: "Rincian kalkulasi laba bersih, persentase kontribusi, serta margin bagi hasil masing-masing mitra per bulan selama tahun 2026.",
+    monthlySharingSub: "Rincian kalkulasi laba bersih, persentase kontribusi, serta margin bagi hasil masing-masing mitra per bulan.",
     kasAllocationNotice: "Semua porsi sisa otomatis dialokasikan kembali untuk pengadaan modal keseluruhan (Kas Pool).",
     month: "Bulan",
     grandTotals: "Total Keseluruhan",

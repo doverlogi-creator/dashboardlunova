@@ -33,11 +33,12 @@ import {
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  ExternalLink
 } from "lucide-react";
 
 import { EventData, CostSettings, AppsScriptConfig } from "./types";
-import { MOCK_EVENTS, DEFAULT_SETTINGS, getDashboardTotals, formatRupiah } from "./utils";
+import { MOCK_EVENTS, DEFAULT_SETTINGS, getDashboardTotals, formatRupiah, parseDate } from "./utils";
 import { translations } from "./translations";
 import StatCard from "./components/StatCard";
 import Charts, { VendorPerformance } from "./components/Charts";
@@ -48,9 +49,18 @@ import AddEventModal from "./components/AddEventModal";
 import AppsScriptSetupModal from "./components/AppsScriptSetupModal";
 import InvoiceGenerator from "./components/InvoiceGenerator";
 
+// Google OAuth and Direct Sheets Integration
+import { initAuth, googleSignIn, logoutUser } from "./lib/googleAuth";
+import { createSpreadsheet, saveSpreadsheetData, fetchSpreadsheetData } from "./lib/googleSheets";
+
 export default function App() {
   // --- STATES ---
   const [activeView, setActiveView] = useState<"dashboard" | "mitra-kinerja" | "pembagian-bulan" | "invoice" | "settings">("dashboard");
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    const currentYearStr = String(new Date().getFullYear());
+    const defaultYears = ["2026", "2027", "2028", "2029", "2030", "2031", "2032", "2033", "2034", "2035"];
+    return defaultYears.includes(currentYearStr) ? currentYearStr : "2026";
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [events, setEvents] = useState<EventData[]>([]);
   const [settings, setSettings] = useState<CostSettings>(DEFAULT_SETTINGS);
@@ -58,6 +68,21 @@ export default function App() {
     webAppUrl: "",
     isDemoMode: true,
     lastSyncedAt: null,
+  });
+
+  // --- GOOGLE OAUTH DIRECT API STATES ---
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
+  const [directSpreadsheetId, setDirectSpreadsheetId] = useState<string>(() => {
+    return localStorage.getItem("lighting_direct_spreadsheet_id_2026") || "";
+  });
+  const [directSpreadsheetUrl, setDirectSpreadsheetUrl] = useState<string>(() => {
+    return localStorage.getItem("lighting_direct_spreadsheet_url_2026") || "";
+  });
+  const [syncType, setSyncType] = useState<"demo" | "apps_script" | "direct">(() => {
+    const saved = localStorage.getItem("lighting_sync_type_2026");
+    if (saved === "direct" || saved === "apps_script") return saved as "direct" | "apps_script";
+    return "demo";
   });
 
   const [theme, setTheme] = useState<"light" | "dark" | "">("");
@@ -232,6 +257,156 @@ export default function App() {
     localStorage.setItem("lighting_gas_config_2026", JSON.stringify(newConfig));
   };
 
+  // --- GOOGLE OAUTH DIRECT API SYNC ENGINE ---
+  const handleSyncDirect = async (token = googleAccessToken, ssId = directSpreadsheetId) => {
+    if (!token || !ssId) {
+      setSyncError(lang === "en" ? "Google Token or Spreadsheet ID is missing." : "Token Google atau Spreadsheet ID belum terhubung.");
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const parsedData = await fetchSpreadsheetData(token, ssId, settings);
+      
+      // Update local storage and memory
+      saveEventsLocally(parsedData.events);
+      saveSettingsLocally(parsedData.settings);
+      
+      setAppsScriptConfig((prev) => ({
+        ...prev,
+        lastSyncedAt: new Date().toISOString(),
+      }));
+    } catch (err: any) {
+      console.error("Direct sync error:", err);
+      let msg = err.message || "Failed to load spreadsheet data.";
+      if (msg.includes("403") || msg.includes("Permission denied")) {
+        msg = lang === "en" 
+          ? "Permission denied. Please ensure you are logged in with the Google Account that owns this spreadsheet."
+          : "Akses ditolak. Pastikan Anda log in dengan Akun Google yang memiliki spreadsheet ini.";
+      } else if (msg.includes("401")) {
+        msg = lang === "en"
+          ? "Session expired. Please log in with Google again."
+          : "Hulu sesi berakhir. Silakan masuk kembali dengan Google.";
+      }
+      setSyncError(msg);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const result = await googleSignIn();
+      if (result) {
+        setGoogleUser(result.user);
+        setGoogleAccessToken(result.accessToken);
+        if (syncType === "direct" && directSpreadsheetId) {
+          await handleSyncDirect(result.accessToken, directSpreadsheetId);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSyncError(err.message || "Failed to Sign-In with Google.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    try {
+      await logoutUser();
+      setGoogleUser(null);
+      setGoogleAccessToken(null);
+      setSyncType("demo");
+      localStorage.setItem("lighting_sync_type_2026", "demo");
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateAndConnectDirectSheet = async () => {
+    let token = googleAccessToken;
+    let user = googleUser;
+
+    if (!token) {
+      try {
+        const result = await googleSignIn();
+        if (result) {
+          token = result.accessToken;
+          user = result.user;
+          setGoogleUser(user);
+          setGoogleAccessToken(token);
+        } else {
+          return;
+        }
+      } catch (err: any) {
+        alert(`Gagal Login Google: ${err.message}`);
+        return;
+      }
+    }
+
+    if (!token) return;
+
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const title = `Dashboard Usaha Lighting - ${user?.displayName || user?.email || "Mitra"} - 2026`;
+      const { spreadsheetId, spreadsheetUrl } = await createSpreadsheet(token, title);
+
+      setDirectSpreadsheetId(spreadsheetId);
+      setDirectSpreadsheetUrl(spreadsheetUrl);
+      localStorage.setItem("lighting_direct_spreadsheet_id_2026", spreadsheetId);
+      localStorage.setItem("lighting_direct_spreadsheet_url_2026", spreadsheetUrl);
+
+      // Seed current transactional info & setups
+      await saveSpreadsheetData(token, spreadsheetId, events, settings);
+
+      setSyncType("direct");
+      localStorage.setItem("lighting_sync_type_2026", "direct");
+
+      setAppsScriptConfig((prev) => ({
+        ...prev,
+        lastSyncedAt: new Date().toISOString(),
+      }));
+
+      alert(lang === "en" 
+        ? "Google Sheet auto-created and linked successfully!" 
+        : "Google Sheet otomatis berhasil dibuat dan dihubungkan!"
+      );
+    } catch (err: any) {
+      console.error("Direct sheet creation / upload failure:", err);
+      setSyncError(err.message || "Failed to create or upload template sheet.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setGoogleUser(user);
+        setGoogleAccessToken(token);
+        if (syncType === "direct" && directSpreadsheetId) {
+          handleSyncDirect(token, directSpreadsheetId);
+        }
+      },
+      () => {
+        setGoogleUser(null);
+        setGoogleAccessToken(null);
+        if (syncType === "direct") {
+          setSyncType("demo");
+          localStorage.setItem("lighting_sync_type_2026", "demo");
+        }
+      }
+    );
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [syncType, directSpreadsheetId]);
+
   // --- GOOGLE APPS SCRIPT SYNC ---
   const handleSyncData = async (targetUrl = appsScriptConfig.webAppUrl) => {
     if (!targetUrl) {
@@ -356,9 +531,26 @@ export default function App() {
     // Generate unique ID
     const newId = `evt-${Date.now()}`;
     const eventWithId: EventData = { id: newId, ...newEvent };
+    const updated = [eventWithId, ...events];
 
-    if (!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
-      // POST to Google Sheets
+    // Local state is the fast optimistic update
+    saveEventsLocally(updated);
+
+    if (syncType === "direct" && googleAccessToken && directSpreadsheetId) {
+      try {
+        setIsSyncing(true);
+        await saveSpreadsheetData(googleAccessToken, directSpreadsheetId, updated, settings);
+        setTimeout(() => handleSyncDirect(googleAccessToken, directSpreadsheetId), 500);
+        return true;
+      } catch (err: any) {
+        console.error("Gagal Posting data ke Google Sheet:", err);
+        setSyncError(`Transaksi tersimpan lokal, namun gagal disinkronkan ke Google Sheet: ${err.message}`);
+        return true;
+      } finally {
+        setIsSyncing(false);
+      }
+    } else if (syncType === "apps_script" && !appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
+      // POST to Google Sheets via Apps Script Web App
       try {
         setIsSyncing(true);
         const res = await fetch(appsScriptConfig.webAppUrl, {
@@ -370,28 +562,18 @@ export default function App() {
           body: JSON.stringify(newEvent),
         });
 
-        // "no-cors" avoids reading body, but appending succeeds. Let's update state immediately:
-        const updated = [eventWithId, ...events];
-        saveEventsLocally(updated);
-        
         // Trigger background sync to get fully formatted numbers
         setTimeout(() => handleSyncData(), 1200);
         return true;
       } catch (err) {
         console.error("Gagal Posting data ke GAS:", err);
         alert("Gagal mengirim data ke Google Sheet. Kami menyimpannya secara lokal di web.");
-        
-        // Fallback local save
-        const updated = [eventWithId, ...events];
-        saveEventsLocally(updated);
         return true;
       } finally {
         setIsSyncing(false);
       }
     } else {
-      // Demo Mode: Save locally
-      const updated = [eventWithId, ...events];
-      saveEventsLocally(updated);
+      // Demo Mode: Save locally (already processed above)
       return true;
     }
   };
@@ -402,7 +584,19 @@ export default function App() {
     const updated = events.filter((e) => e.id !== id);
     saveEventsLocally(updated);
 
-    if (!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
+    if (syncType === "direct" && googleAccessToken && directSpreadsheetId) {
+      try {
+        setIsSyncing(true);
+        setSyncError(null);
+        await saveSpreadsheetData(googleAccessToken, directSpreadsheetId, updated, settings);
+        setTimeout(() => handleSyncDirect(googleAccessToken, directSpreadsheetId), 500);
+      } catch (err: any) {
+        console.error("Gagal menghapus secara langsung dari Google Sheet:", err);
+        setSyncError(`Gagal memperbarui Google Sheet setelah baris terhapus: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    } else if (syncType === "apps_script" && !appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
       try {
         setIsSyncing(true);
         setSyncError(null);
@@ -447,7 +641,19 @@ export default function App() {
 
     if (!settingsToSync) return;
 
-    if (!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
+    if (syncType === "direct" && googleAccessToken && directSpreadsheetId) {
+      try {
+        setIsSyncing(true);
+        setSyncError(null);
+        await saveSpreadsheetData(googleAccessToken, directSpreadsheetId, events, settingsToSync);
+        setTimeout(() => handleSyncDirect(googleAccessToken, directSpreadsheetId), 500);
+      } catch (err: any) {
+        console.error("Gagal update parameter biaya ke Google Sheet secara langsung:", err);
+        setSyncError(`Gagal memperbarui parameter biaya di Google Sheets: ${err.message}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    } else if (syncType === "apps_script" && !appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl) {
       try {
         setIsSyncing(true);
         setSyncError(null);
@@ -510,8 +716,15 @@ export default function App() {
     }
   };
 
-  // --- METRICS CALCULATION ---
-  const totals = getDashboardTotals(events, settings);
+  // --- FILTERED EVENTS & METRICS CALCULATION ---
+  const filteredEvents = events.filter((evt) => {
+    if (!evt.tanggal) return false;
+    const d = parseDate(evt.tanggal);
+    if (isNaN(d.getTime())) return false;
+    if (selectedYear === "all") return true;
+    return d.getFullYear() === Number(selectedYear);
+  });
+  const totals = getDashboardTotals(filteredEvents, settings);
   const t = translations[lang];
 
   return (
@@ -810,10 +1023,10 @@ export default function App() {
             </div>
 
             {/* --- GRAPHS SECTION (Bento Box Section 1) --- */}
-            <Charts events={events} settings={settings} lang={lang} />
+            <Charts events={events} settings={settings} lang={lang} selectedYear={selectedYear} setSelectedYear={setSelectedYear} />
 
             {/* --- INTERACTIVE CALENDAR SCHEDULE REMINDER --- */}
-            <Calendar events={events} settings={settings} lang={lang} />
+            <Calendar events={filteredEvents} settings={settings} lang={lang} selectedYear={selectedYear} />
           </>
         )}
 
@@ -850,11 +1063,11 @@ export default function App() {
             </div>
 
             {/* Vendor/WO Performance ranking */}
-            <VendorPerformance events={events} />
+            <VendorPerformance events={filteredEvents} />
 
             {/* Log table */}
             <EventTable
-              events={events}
+              events={filteredEvents}
               settings={settings}
               onDeleteEvent={handleDeleteEvent}
               onEditCosts={(evt) => {
@@ -863,13 +1076,13 @@ export default function App() {
               }}
               lang={lang}
             />
-
+            
             {/* Formula references card */}
             <div className="bg-zinc-900/40 p-6 rounded-2xl border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs font-sans">
               <div className="space-y-1">
                 <span className="font-bold text-zinc-300 flex items-center gap-1">
                   <Info className="w-4 h-4 text-blue-400" />
-                  {lang === "en" ? "Lighting Operations Formula 2026:" : "Formula Keuangan Usaha Lighting 2026:"}
+                  {lang === "en" ? "Lighting Operations Formula:" : "Formula Keuangan Usaha Lighting:"}
                 </span>
                 <p className="text-zinc-400 leading-relaxed pl-5">
                   {lang === "en" ? (
@@ -912,7 +1125,7 @@ export default function App() {
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
-              <MonthlySharing events={events} settings={settings} lang={lang} />
+              <MonthlySharing events={filteredEvents} settings={settings} lang={lang} selectedYear={selectedYear} />
             </div>
           </div>
         )}
@@ -920,7 +1133,7 @@ export default function App() {
         {activeView === "invoice" && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl animate-fadeIn">
             <InvoiceGenerator
-              events={events}
+              events={filteredEvents}
               settings={settings}
               onBack={() => setActiveView("dashboard")}
               lang={lang}
@@ -942,81 +1155,252 @@ export default function App() {
                 <Settings className="w-6 h-6 text-blue-500 stroke-[2] animate-spin-slow" />
               </h1>
               <p className="text-zinc-400 text-sm mt-1 max-w-2xl leading-relaxed">
-                Konfigurasi tautan integrasi Google Sheets dan setel parameter biaya operasional, gaji, bensin, dan pembagian hasil mitra.
+                Konfigurasi tautan integrasi Google Sheets dan status sinkronisasi cloud secara realtime.
               </p>
             </div>
 
             {/* Google Sheets Integration Card */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
                 <div className="flex items-center gap-3">
-                  <span className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-blue-500 shrink-0">
+                  <span className="p-2.5 rounded-xl bg-blue-950/40 border border-blue-900/35 text-blue-400 shrink-0">
                     <Database className="w-5 h-5 animate-pulse" />
                   </span>
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-200">Koneksi Google Sheets (Apps Script Web App)</h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">Sinkronkan data transaksi dan parameter biaya secara real-time</p>
+                    <h3 className="text-base font-bold text-zinc-100">Integrasi Cloud Google Sheets</h3>
+                    <p className="text-xs text-zinc-450 mt-1">Metode pencatatan data transaksi dan sinkronisasi parameter biaya secara real-time</p>
                   </div>
                 </div>
-                <div className="flex items-center flex-wrap gap-2 shrink-0">
-                  {appsScriptConfig.webAppUrl && (
-                    <button
-                      onClick={handleToggleDemoMode}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                        appsScriptConfig.isDemoMode
-                          ? "bg-blue-500/10 text-blue-500 border-blue-500/25 hover:bg-blue-550/20"
-                          : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white"
-                      }`}
-                    >
-                      {appsScriptConfig.isDemoMode ? "Aktifkan Live Sheet" : "Masuk Mode Simulasi"}
-                    </button>
-                  )}
-                  {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl && (
-                    <button
-                      onClick={async () => {
-                        setIsSyncing(true);
-                        // Post settings to sheets first, which automatically updates and triggers pulling of latest database events & settings
-                        await handleUpdateSettingsOnSheet(settings);
-                      }}
-                      disabled={isSyncing}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 active:scale-95 disabled:opacity-50 text-blue-400 border border-zinc-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                      <span>{isSyncing ? "Menyelaras..." : "Gores Sinkron"}</span>
-                    </button>
-                  )}
+
+                {/* Mode Selector Tabs */}
+                <div className="flex p-0.5 bg-zinc-950 rounded-xl border border-zinc-800 self-start md:self-auto">
                   <button
-                    onClick={() => setIsSetupGasOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer"
+                    onClick={() => {
+                      setSyncType("direct");
+                      localStorage.setItem("lighting_sync_type_2026", "direct");
+                      if (googleAccessToken && directSpreadsheetId) {
+                        handleSyncDirect(googleAccessToken, directSpreadsheetId);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      syncType === "direct"
+                        ? "bg-blue-600 text-white shadow-md font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
                   >
-                    <CloudLightning className="w-3.5 h-3.5 text-white" />
-                    <span>{appsScriptConfig.webAppUrl ? "Ubah Koneksi Sheet" : "Hubungkan Google Sheet"}</span>
+                    Otomatis (Direct API)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSyncType("apps_script");
+                      localStorage.setItem("lighting_sync_type_2026", "apps_script");
+                      if (appsScriptConfig.webAppUrl) {
+                        const updated = { ...appsScriptConfig, isDemoMode: false };
+                        setAppsScriptConfig(updated);
+                        localStorage.setItem("lighting_gas_config_2026", JSON.stringify(updated));
+                        handleSyncData(appsScriptConfig.webAppUrl);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      syncType === "apps_script"
+                        ? "bg-blue-600 text-white shadow-md font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Manual (Apps Script)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSyncType("demo");
+                      localStorage.setItem("lighting_sync_type_2026", "demo");
+                      const updated = { ...appsScriptConfig, isDemoMode: true };
+                      setAppsScriptConfig(updated);
+                      localStorage.setItem("lighting_gas_config_2026", JSON.stringify(updated));
+                    }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      syncType === "demo"
+                        ? "bg-blue-600 text-white shadow-md font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Simulasi Offline
                   </button>
                 </div>
               </div>
 
-              <div className="text-xs space-y-2 text-zinc-400 bg-zinc-950 p-4 rounded-xl border border-zinc-800">
-                <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
-                  <span>Status Aplikasi:</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${appsScriptConfig.isDemoMode ? "bg-purple-950/40 text-purple-400 border border-purple-900/30 font-mono" : "bg-blue-950/40 text-blue-400 border border-blue-900/30 font-mono"}`}>
-                    {appsScriptConfig.isDemoMode ? "DEMO OFFLINE (SIMULASI)" : "LIVE GOOGLE SHEETS"}
-                  </span>
+              {/* Direct API Mode UI */}
+              {syncType === "direct" && (
+                <div className="space-y-4">
+                  {!googleUser ? (
+                    <div className="flex flex-col items-center text-center p-8 bg-zinc-950 border border-zinc-800 rounded-xl space-y-3">
+                      <Cloud className="w-10 h-10 text-zinc-500 stroke-[1.5]" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-zinc-200">Hubungkan Akun Google Anda</p>
+                        <p className="text-xs text-zinc-450 max-w-sm">
+                          Sambungkan Google Drive & Sheets untuk membuat spreadsheet otomatis tanpa perantara server atau script rumit.
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleGoogleLogin}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-all transform hover:scale-[1.02] active:scale-95 shadow-md shadow-blue-900/10 cursor-pointer"
+                      >
+                        <User className="w-4 h-4" />
+                        <span>Sign In dengan Google</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left: Account Status */}
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 flex flex-col justify-between">
+                        <div className="flex items-center gap-3">
+                          {googleUser.photoURL ? (
+                            <img
+                              src={googleUser.photoURL}
+                              alt="Profile"
+                              referrerPolicy="no-referrer"
+                              className="w-10 h-10 rounded-full border border-blue-500/30"
+                            />
+                          ) : (
+                            <span className="p-2.5 rounded-full bg-blue-950 text-blue-400 border border-blue-900">
+                              <User className="w-5 h-5" />
+                            </span>
+                          )}
+                          <div>
+                            <p className="text-xs font-medium text-zinc-450">Akun Terhubung:</p>
+                            <p className="text-sm font-bold text-zinc-200">{googleUser.displayName || "Google User"}</p>
+                            <p className="text-xs text-zinc-500 font-mono">{googleUser.email}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleGoogleLogout}
+                            className="text-xs font-semibold text-red-400 hover:text-red-350 bg-red-950/20 hover:bg-red-950/30 border border-red-900/30 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                          >
+                            Disconnect Akun
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Right: Spreadsheet Status */}
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl flex flex-col justify-between">
+                        {directSpreadsheetId ? (
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-xs font-medium text-zinc-450">Google Spreadsheet Terhubung:</p>
+                              <p className="text-sm font-bold text-zinc-200 truncate mt-0.5">Dashboard Usaha Lighting 2026</p>
+                              <span className="inline-block mt-1 font-mono text-[10px] bg-blue-950/50 text-blue-400 border border-blue-900/30 px-2 py-0.5 rounded">
+                                ID: {directSpreadsheetId.substring(0, 12)}...
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <a
+                                href={directSpreadsheetUrl || `https://docs.google.com/spreadsheets/d/${directSpreadsheetId}/edit`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-950 text-blue-450 hover:text-white border border-blue-900/40 hover:bg-blue-900/30 rounded-lg text-xs font-semibold transition-all"
+                              >
+                                <span>Buka Excel Sheet</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                              <button
+                                onClick={() => handleSyncDirect()}
+                                disabled={isSyncing}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 disabled:opacity-50 text-zinc-250 border border-zinc-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                              >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                                <span>{isSyncing ? "Sinkron..." : "Sinkron Sekarang"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 my-auto py-2 flex flex-col items-center text-center">
+                            <p className="text-xs text-zinc-450 max-w-xs">
+                              Anda berhasil login! Klik di bawah untuk secara otomatis membuat spreadsheet siap pakai di Google Drive Anda.
+                            </p>
+                            <button
+                              onClick={handleCreateAndConnectDirectSheet}
+                              disabled={isSyncing}
+                              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all shadow cursor-pointer"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>{isSyncing ? "Membuat..." : "Buat Spreadsheet Baru"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
-                  <span>Web App URL:</span>
-                  <span className="font-mono text-zinc-500 select-all truncate max-w-xs sm:max-w-md block" title={appsScriptConfig.webAppUrl}>
-                    {appsScriptConfig.webAppUrl || "Belum Terhubung"}
-                  </span>
-                </div>
-                {appsScriptConfig.lastSyncedAt && (
-                  <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
-                    <span>Waktu Sinkron Terakhir:</span>
-                    <span className="font-mono text-zinc-300">
-                      {new Date(appsScriptConfig.lastSyncedAt).toLocaleString("id-ID")}
-                    </span>
+              )}
+
+              {/* Apps Script Mode UI */}
+              {syncType === "apps_script" && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-950 p-4 border border-zinc-900 rounded-xl">
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-zinc-200">Kustomisasi URL Apps Script Web App</p>
+                      <p className="text-[11px] text-zinc-450">Sinkronkan database memakai Google Apps Script Web App eksternal.</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl && (
+                        <button
+                          onClick={async () => {
+                            setIsSyncing(true);
+                            await handleUpdateSettingsOnSheet(settings);
+                          }}
+                          disabled={isSyncing}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 disabled:opacity-50 text-blue-400 border border-zinc-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                          <span>{isSyncing ? "Menyelaras..." : "Sinkron"}</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsSetupGasOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer"
+                      >
+                        <CloudLightning className="w-3.5 h-3.5 text-white" />
+                        <span>{appsScriptConfig.webAppUrl ? "Ubah Web App URL" : "Hubungkan Web App"}</span>
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  <div className="text-xs space-y-2 text-zinc-450 bg-zinc-950/70 p-4 rounded-xl border border-zinc-800">
+                    <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
+                      <span>Status Aplikasi:</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950/40 text-blue-400 border border-blue-900/30 font-mono">
+                        LIVE APPS SCRIPT WEB APP
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center bg-zinc-900/40 p-2.5 rounded-lg">
+                      <span>Web App URL:</span>
+                      <span className="font-mono text-zinc-500 select-all truncate max-w-xs sm:max-w-md block" title={appsScriptConfig.webAppUrl}>
+                        {appsScriptConfig.webAppUrl || "Belum Terhubung"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Offline/Demo Mode UI */}
+              {syncType === "demo" && (
+                <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-center space-y-2">
+                  <WifiOff className="w-8 h-8 text-zinc-550 mx-auto stroke-[1.5]" />
+                  <p className="text-sm font-semibold text-zinc-200">Mode Simulasi Offline Aktif</p>
+                  <p className="text-xs text-zinc-450 max-w-md mx-auto">
+                    Data transaksi dan biaya disimpan secara lokal di web browser saat ini (localStorage). Data Anda sepenuhnya aman secara lokal namun tidak disinkronkan ke cloud.
+                  </p>
+                </div>
+              )}
+
+              {/* Common Status Overlay */}
+              {appsScriptConfig.lastSyncedAt && syncType !== "demo" && (
+                <div className="text-xs text-zinc-500 text-right">
+                  Waktu Sinkron Terakhir: <span className="font-mono text-zinc-400">{new Date(appsScriptConfig.lastSyncedAt).toLocaleString("id-ID")}</span>
+                </div>
+              )}
             </div>
 
 
@@ -1054,12 +1438,10 @@ export default function App() {
                 <Sliders className="w-5 h-5 text-blue-500" />
                 <div>
                   <h3 className="text-lg font-semibold text-zinc-100">
-                    {editingCostEvent ? `Ubah Parameter Biaya: ${editingCostEvent.vendor}` : "Ubah Parameter Biaya Usaha"}
+                    {editingCostEvent ? `Ubah Parameter Biaya: ${editingCostEvent.vendor}` : "Ubah Parameter Biaya"}
                   </h3>
                   <p className="text-[10px] text-zinc-400 mt-0.5">
-                    {editingCostEvent 
-                      ? `Mengatur parameter biaya khusus untuk acara tanggal ${editingCostEvent.tanggal}` 
-                      : "Konfigurasi operasional, gaji, bensin, dan bagi hasil mitra"}
+                    {editingCostEvent && `Mengatur parameter biaya khusus untuk acara tanggal ${editingCostEvent.tanggal}`}
                   </p>
                 </div>
               </div>
@@ -1090,13 +1472,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={editingCostEvent ? (editingCostEvent.operasionalAcara !== undefined ? editingCostEvent.operasionalAcara : settings.operasionalAcara) : settings.operasionalAcara}
+                        value={editingCostEvent ? (editingCostEvent.operasionalAcara !== undefined ? editingCostEvent.operasionalAcara : settings.operasionalAcara) : 0}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           if (editingCostEvent) {
                             updateSpecificEventCost("operasionalAcara", val);
-                          } else {
-                            saveSettingsLocally({ ...settings, operasionalAcara: val });
                           }
                         }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
@@ -1108,13 +1488,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={editingCostEvent ? (editingCostEvent.cashback !== undefined ? editingCostEvent.cashback : settings.cashback) : settings.cashback}
+                        value={editingCostEvent ? (editingCostEvent.cashback !== undefined ? editingCostEvent.cashback : settings.cashback) : 0}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           if (editingCostEvent) {
                             updateSpecificEventCost("cashback", val);
-                          } else {
-                            saveSettingsLocally({ ...settings, cashback: val });
                           }
                         }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
@@ -1136,13 +1514,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={editingCostEvent ? (editingCostEvent.karyawanAcara !== undefined ? editingCostEvent.karyawanAcara : settings.karyawanAcara) : settings.karyawanAcara}
+                        value={editingCostEvent ? (editingCostEvent.karyawanAcara !== undefined ? editingCostEvent.karyawanAcara : settings.karyawanAcara) : 0}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           if (editingCostEvent) {
                             updateSpecificEventCost("karyawanAcara", val);
-                          } else {
-                            saveSettingsLocally({ ...settings, karyawanAcara: val });
                           }
                         }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
@@ -1154,13 +1530,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        value={editingCostEvent ? (editingCostEvent.bensinAcara !== undefined ? editingCostEvent.bensinAcara : settings.bensinAcara) : settings.bensinAcara}
+                        value={editingCostEvent ? (editingCostEvent.bensinAcara !== undefined ? editingCostEvent.bensinAcara : settings.bensinAcara) : 0}
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           if (editingCostEvent) {
                             updateSpecificEventCost("bensinAcara", val);
-                          } else {
-                            saveSettingsLocally({ ...settings, bensinAcara: val });
                           }
                         }}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500 font-mono"
@@ -1173,31 +1547,22 @@ export default function App() {
               {/* Reset Option Footer */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-zinc-800/60 pt-4 mt-2">
                 <div className="text-xs text-zinc-400 font-sans">
-                  {editingCostEvent ? (
-                    <span className="text-zinc-400">
-                      Mengubah biaya untuk baris ini saja. Set parameters kustom Anda di atas.
-                    </span>
-                  ) : !appsScriptConfig.isDemoMode && appsScriptConfig.webAppUrl ? (
-                    <span className="flex items-center gap-1.5 text-blue-400 font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      Parameter disimpan lokal di website. Klik tombol "Gores Sinkron" untuk menyelaraskan ke Google Sheets.
-                    </span>
-                  ) : (
-                    <span className="text-zinc-500">
-                      Mode Simulasi Aktif. Hubungkan Google Sheets di menu pengaturan untuk menyelaraskan parameter.
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsResetConfirmOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-                  <span>
-                    {editingCostEvent ? "Hapus Kustomisasi (Ikut Biaya Global)" : "Kembalikan ke Parameter Default"}
+                  <span className="text-zinc-400">
+                    Mengubah biaya untuk baris ini saja. Set parameters kustom Anda di atas.
                   </span>
-                </button>
+                </div>
+                {editingCostEvent && (
+                  <button
+                    type="button"
+                    onClick={() => setIsResetConfirmOpen(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-850 hover:bg-zinc-800 hover:text-white text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans shrink-0"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+                    <span>
+                      Hapus Kustomisasi (Ikut Default Sistem)
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1226,14 +1591,12 @@ export default function App() {
                 <RefreshCw className="w-5 h-5" />
               </div>
               <h3 className="text-sm font-bold text-zinc-100 font-sans">
-                {editingCostEvent ? "Hapus Kustomisasi" : "Kembalikan ke Default"}
+                Hapus Kustomisasi
               </h3>
             </div>
             
             <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-              {editingCostEvent 
-                ? "Apakah Anda yakin ingin menghapus semua parameter kustomisasi biaya untuk event ini dan mengembalikan ke parameter bisnis global?"
-                : "Apakah Anda yakin ingin mengembalikan semua parameter biaya ke default? Nilai saat ini akan ditimpa dengan nilai bawaan."}
+              Apakah Anda yakin ingin menghapus semua parameter kustomisasi biaya untuk event ini dan mengembalikan ke parameter default sistem?
             </p>
             
             <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -1260,10 +1623,6 @@ export default function App() {
                     saveEventsLocally(updatedEvents);
                     setEditingCostEvent(null);
                     setIsCostModalOpen(false);
-                  } else {
-                    const nextSettings = { ...DEFAULT_SETTINGS };
-                    saveSettingsLocally(nextSettings);
-                    handleUpdateSettingsOnSheet(nextSettings);
                   }
                   setIsResetConfirmOpen(false);
                 }}

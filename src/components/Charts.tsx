@@ -15,13 +15,27 @@ interface ChartsProps {
   events: EventData[];
   settings: CostSettings;
   lang?: "en" | "id";
+  selectedYear: string;
+  setSelectedYear: (y: string) => void;
 }
 
-export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
+export default function Charts({ events, settings, lang = "en", selectedYear, setSelectedYear }: ChartsProps) {
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
   const [activeDonutSegment, setActiveDonutSegment] = useState<string | null>(null);
 
-  // Group financial data by month (Jan - Dec 2026)
+  // Generate a range of years starting from 2026 up to 2035, and merge with any dynamic years from events
+  const defaultYears = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
+  const eventYears = events.map((evt) => {
+    if (!evt.tanggal) return null;
+    const d = parseDate(evt.tanggal);
+    return isNaN(d.getTime()) ? null : d.getFullYear();
+  }).filter((y): y is number => y !== null);
+
+  const availableYears = Array.from(
+    new Set([...defaultYears, ...eventYears])
+  ).sort((a, b) => a - b);
+
+  // Group financial data by month (Jan - Dec)
   const monthNamesEN = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -33,11 +47,13 @@ export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
   const monthNames = lang === "en" ? monthNamesEN : monthNamesID;
 
   const monthlyData = monthNames.map((name, index) => {
-    // Filter events for this month in Year 2026
+    // Filter events for this month in the selected Year (if different from static 2026)
     const monthEvents = events.filter((evt) => {
       if (!evt.tanggal) return false;
       const dat = parseDate(evt.tanggal);
-      return !isNaN(dat.getTime()) && dat.getMonth() === index && dat.getFullYear() === 2026;
+      if (isNaN(dat.getTime()) || dat.getMonth() !== index) return false;
+      if (selectedYear === "all") return true;
+      return dat.getFullYear() === Number(selectedYear);
     });
 
     let revenue = 0;
@@ -69,33 +85,51 @@ export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
   let p2ShareAmt = 0;
   let kasShareAmt = 0;
 
-  // Load monthly overrides
-  let monthlyShares: Record<number, { p1: string; p2: string }> = {};
-  const saved = localStorage.getItem("lighting_monthly_shares_override_2026");
-  if (saved) {
+  // Load monthly overrides for the selected year
+  const monthlyShares: Record<number, { p1: string; p2: string }> = {};
+  const savedV2 = localStorage.getItem("lighting_monthly_shares_override_v2");
+  if (savedV2) {
     try {
-      const parsed = JSON.parse(saved);
-      Object.keys(parsed).forEach((key) => {
-        const k = Number(key);
-        const item = parsed[k];
-        if (item) {
-          let p1Val = "40%";
-          let p2Val = "40%";
-          if (typeof item.p1 === 'number') {
-            p1Val = item.p1 === 40 ? "40%" : String(item.p1);
-          } else if (typeof item.p1 === 'string') {
-            p1Val = item.p1;
-          }
-          if (typeof item.p2 === 'number') {
-            p2Val = item.p2 === 40 ? "40%" : String(item.p2);
-          } else if (typeof item.p2 === 'string') {
-            p2Val = item.p2;
-          }
-          monthlyShares[k] = { p1: p1Val, p2: p2Val };
+      const parsed = JSON.parse(savedV2);
+      for (let index = 0; index < 12; index++) {
+        const key = `${selectedYear}_${index}`;
+        if (parsed[key]) {
+          monthlyShares[index] = parsed[key];
         }
-      });
+      }
     } catch (e) {
       // Ignored
+    }
+  }
+
+  // Fallback to legacy structure for Year 2026
+  if (selectedYear === "2026" && Object.keys(monthlyShares).length === 0) {
+    const savedLegacy = localStorage.getItem("lighting_monthly_shares_override_2026");
+    if (savedLegacy) {
+      try {
+        const parsed = JSON.parse(savedLegacy);
+        Object.keys(parsed).forEach((key) => {
+          const k = Number(key);
+          const item = parsed[k];
+          if (item) {
+            let p1Val = "40%";
+            let p2Val = "40%";
+            if (typeof item.p1 === 'number') {
+              p1Val = item.p1 === 40 ? "40%" : String(item.p1);
+            } else if (typeof item.p1 === 'string') {
+              p1Val = item.p1;
+            }
+            if (typeof item.p2 === 'number') {
+              p2Val = item.p2 === 40 ? "40%" : String(item.p2);
+            } else if (typeof item.p2 === 'string') {
+              p2Val = item.p2;
+            }
+            monthlyShares[k] = { p1: p1Val, p2: p2Val };
+          }
+        });
+      } catch (e) {
+        // Ignored
+      }
     }
   }
 
@@ -103,7 +137,9 @@ export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
     const monthEvents = events.filter((evt) => {
       if (!evt.tanggal) return false;
       const dat = parseDate(evt.tanggal);
-      return !isNaN(dat.getTime()) && dat.getMonth() === index && dat.getFullYear() === 2026;
+      if (isNaN(dat.getTime()) || dat.getMonth() !== index) return false;
+      if (selectedYear === "all") return true;
+      return dat.getFullYear() === Number(selectedYear);
     });
 
     let monthNetProfit = 0;
@@ -162,6 +198,11 @@ export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
   // Vendor statistics
   const vendorMap: Record<string, { revenue: number; count: number }> = {};
   events.forEach((evt) => {
+    if (!evt.tanggal) return;
+    const d = parseDate(evt.tanggal);
+    if (isNaN(d.getTime())) return;
+    if (selectedYear !== "all" && d.getFullYear() !== Number(selectedYear)) return;
+
     const v = evt.vendor || "Happylee";
     if (!vendorMap[v]) {
       vendorMap[v] = { revenue: 0, count: 0 };
@@ -181,15 +222,43 @@ export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
   const t = translations[lang];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* 1. Monthly Revenue & Profit Chart (Bar Graph) */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 lg:col-span-2 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-500" />
-              <h3 className="text-base font-bold text-zinc-100">{lang === "en" ? "Monthly Financial Trend (2026)" : "Tren Finansial Per Bulan (2026)"}</h3>
-            </div>
+    <div className="space-y-6">
+      {/* Active Filter Info for Charts */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4.5 gap-4">
+        <div className="space-y-0.5">
+          <h4 className="text-sm font-bold text-zinc-150 font-sans">
+            {lang === "en" ? "Interactive Charts & Performance Analytics" : "Analisis Grafik & Performa Interaktif"}
+          </h4>
+          <p className="text-[11px] text-zinc-400 font-sans">
+            {lang === "en" ? `Filtered for: Year ${selectedYear === "all" ? "All Time" : selectedYear}` : `Difilter untuk: Tahun ${selectedYear === "all" ? "Semua Tahun" : selectedYear}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs text-zinc-400 font-sans font-bold uppercase tracking-wider">{lang === "en" ? "Filter Year:" : "Filter Tahun:"}</span>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="bg-zinc-950 border border-zinc-805 rounded-lg px-3.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-505 font-semibold cursor-pointer min-w-[120px]"
+          >
+            <option value="all">{lang === "en" ? "All Years" : "Semua Tahun"}</option>
+            {availableYears.map((y) => (
+              <option key={y} value={String(y)}>{y}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 1. Monthly Revenue & Profit Chart (Bar Graph) */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-blue-500" />
+                <h3 className="text-base font-bold text-zinc-100">
+                  {lang === "en" ? `Monthly Financial Trend (${selectedYear === "all" ? "All Time" : selectedYear})` : `Tren Finansial Per Bulan (${selectedYear === "all" ? "Semua Tahun" : selectedYear})`}
+                </h3>
+              </div>
             {/* Guide markers */}
             <div className="flex items-center gap-3 text-[10px] font-bold">
               <div className="flex items-center gap-1">
@@ -437,6 +506,7 @@ export default function Charts({ events, settings, lang = "en" }: ChartsProps) {
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
@@ -466,7 +536,7 @@ export function VendorPerformance({ events, lang = "en" }: { events: EventData[]
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full">
       <div className="flex items-center gap-2 mb-4">
         <Award className="w-5 h-5 text-blue-500" />
-        <h3 className="text-base font-bold text-zinc-100">{lang === "en" ? "Wedding Organizer & Vendor Performance (2026)" : "Kinerja Mitra WO & Vendor (2026)"}</h3>
+        <h3 className="text-base font-bold text-zinc-100">{lang === "en" ? "Wedding Organizer & Vendor Performance" : "Kinerja Mitra WO & Vendor"}</h3>
       </div>
       <p className="text-xs text-zinc-400 mb-6">
         {lang === "en" ? "List of Wedding Organizers (WO) and key vendors with total reservation count and cumulative revenue contribution." : "Daftar Wedding Organizer (WO) dan vendor utama yang paling sering memesan jasa lighting beserta total omset sewa."}
