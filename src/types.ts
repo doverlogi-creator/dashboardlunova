@@ -31,10 +31,20 @@ export interface CostSettings {
   partner1Share: number; // 40 (%)
   partner2Name: string; // "Surya"
   partner2Share: number; // 40 (%)
+  kasTambahan?: number; // raw value for manual capital/kas additions
 }
 
 export interface AppsScriptConfig {
   webAppUrl: string;
   isDemoMode?: boolean;
   lastSyncedAt?: string | null;
+}
+
+export interface ProcurementItem {
+  id: string;
+  tanggal: string; // "YYYY-MM-DD"
+  namaBarang: string; // e.g. "Moving Head Beam"
+  harga: number; // cost in IDR
+  jumlah: number; // quantity
+  keterangan: string; // notes
 }

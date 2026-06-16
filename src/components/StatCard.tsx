@@ -9,7 +9,7 @@ import { formatRupiah } from "../utils";
 interface StatCardProps {
   id: string;
   title: string;
-  value: number;
+  value: number | string;
   icon: ReactNode;
   colorClass?: string; // e.g. "text-emerald-400", "text-amber-400"
   description?: string;
@@ -42,7 +42,7 @@ export default function StatCard({
             {title}
           </span>
           <h3 className={`text-2xl font-bold tracking-tight font-mono ${colorClass}`}>
-            {formatRupiah(value)}
+            {typeof value === "number" ? formatRupiah(value) : value}
           </h3>
         </div>
         <div className={`p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-400 group-hover:${colorClass} group-hover:border-zinc-700 transition-all`}>

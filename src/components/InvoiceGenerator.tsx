@@ -786,16 +786,16 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                 {/* Header Logo */}
                 <div className="flex justify-between items-center pb-2">
                   <div>
-                    <h1 className="text-3xl font-bold tracking-normal text-zinc-900 font-sans" style={{ fontFamily: "Arial, sans-serif" }}>
+                    <h1 className="text-3xl font-bold tracking-normal text-slate-900 font-sans" style={{ fontFamily: "Arial, sans-serif" }}>
                       Invoice
                     </h1>
                   </div>
                   <div className="flex items-center gap-2 text-right">
                     <div className="leading-none">
-                      <h2 className="text-2xl font-bold text-zinc-950 tracking-tight" style={{ fontFamily: "Arial, sans-serif" }}>
+                      <h2 className="text-2xl font-bold text-slate-950 tracking-tight" style={{ fontFamily: "Arial, sans-serif" }}>
                         {companyName}
                       </h2>
-                      <p className="text-xs text-zinc-700 tracking-widest uppercase font-medium mt-0.5">
+                      <p className="text-xs text-slate-600 tracking-widest uppercase font-medium mt-0.5">
                         {companySubtitle}
                       </p>
                     </div>
@@ -830,7 +830,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                   </div>
                 </div>
 
-                <div className="border-t border-zinc-950 my-1"></div>
+                <div className="border-t border-slate-950 my-1"></div>
 
                 {/* Bill To & Event Details Form cells styled exactly like a printed spreadsheet */}
                 <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-[11px] leading-relaxed py-1">
@@ -838,18 +838,18 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                   {/* Left Column Fields */}
                   <div className="space-y-2">
                     <div className="space-y-0.5">
-                      <span className="font-bold text-zinc-950">Kepada :</span>
-                      <div className="bg-zinc-50 border border-zinc-200 rounded px-2 py-1 flex items-center justify-between text-zinc-900 min-h-[24px]">
+                      <span className="font-bold text-slate-800">Kepada :</span>
+                      <div className="bg-slate-50 border border-slate-200 rounded px-2 py-1 flex items-center justify-between text-slate-800 min-h-[24px]">
                         <span className="font-semibold">{clientName || " "}</span>
-                        <span className="text-[8px] text-zinc-400">▼</span>
+                        <span className="text-[8px] text-slate-400">▼</span>
                       </div>
                     </div>
 
                     <div className="space-y-0.5">
-                      <span className="font-bold text-zinc-950">Lokasi Acara :</span>
-                      <div className="bg-zinc-50 border border-zinc-200 rounded px-2 py-1 flex items-center justify-between text-zinc-900 min-h-[24px]">
+                      <span className="font-bold text-slate-800">Lokasi Acara :</span>
+                      <div className="bg-slate-50 border border-slate-200 rounded px-2 py-1 flex items-center justify-between text-slate-800 min-h-[24px]">
                         <span className="font-semibold truncate max-w-[195px]">{eventLocation || " "}</span>
-                        <span className="text-[8px] text-zinc-400">▼</span>
+                        <span className="text-[8px] text-slate-400">▼</span>
                       </div>
                     </div>
                   </div>
@@ -857,18 +857,18 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                   {/* Right Column Fields */}
                   <div className="space-y-2">
                     <div className="space-y-0.5">
-                      <span className="font-bold text-zinc-950">Tanggal :</span>
-                      <div className="bg-zinc-50 border border-zinc-200 rounded px-2 py-1 flex items-center justify-between text-zinc-900 min-h-[24px]">
+                      <span className="font-bold text-slate-800">Tanggal :</span>
+                      <div className="bg-slate-50 border border-slate-200 rounded px-2 py-1 flex items-center justify-between text-slate-800 min-h-[24px]">
                         <span className="font-mono font-semibold">{eventDate || formatDateIndo(invoiceDate, lang)}</span>
-                        <span className="text-[8px] text-zinc-400">▼</span>
+                        <span className="text-[8px] text-slate-400">▼</span>
                       </div>
                     </div>
 
                     <div className="space-y-0.5">
-                      <span className="font-bold text-zinc-950">Jenis Paket :</span>
-                      <div className="bg-zinc-50 border border-zinc-200 rounded px-2 py-1 flex items-center justify-between text-zinc-900 min-h-[24px]">
+                      <span className="font-bold text-slate-800">Jenis Paket :</span>
+                      <div className="bg-slate-50 border border-slate-200 rounded px-2 py-1 flex items-center justify-between text-slate-800 min-h-[24px]">
                         <span className="font-semibold">{jenisPaket || " "}</span>
-                        <span className="text-[8px] text-zinc-400">▼</span>
+                        <span className="text-[8px] text-slate-400">▼</span>
                       </div>
                     </div>
                   </div>
@@ -877,7 +877,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                 {/* Items Table with alternating dotted backgrounds like the spreadsheet screenshot */}
                 <div className="pt-2">
                   {/* Double bordered styled Table header */}
-                  <div className="border-t-2 border-zinc-950 border-b-2 border-zinc-950 py-1.5 flex justify-between text-[11px] font-bold text-zinc-950 bg-white">
+                  <div className="border-t-2 border-slate-950 border-b-2 border-slate-950 py-1.5 flex justify-between text-[11px] font-bold text-slate-900 bg-white">
                     <div className="w-[45%] pl-4">Keterangan</div>
                     <div className="w-[20%] text-center">Harga</div>
                     <div className="w-[15%] text-center">Jumlah</div>
@@ -886,7 +886,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
 
                   {/* 1. JASA SECTION */}
                   <div className="text-[10px]">
-                    <div className="font-bold py-1 px-4 bg-white text-zinc-950 select-none">
+                    <div className="font-bold py-1 px-4 bg-white text-slate-900 select-none">
                       Jasa
                     </div>
                     
@@ -896,8 +896,8 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                       return (
                         <div
                           key={row.id}
-                          className={`flex justify-between items-center py-1.5 border-b border-dotted border-zinc-350 text-zinc-900 ${
-                            idx % 2 === 1 ? "bg-zinc-100/60" : "bg-white"
+                          className={`flex justify-between items-center py-1.5 border-b border-dotted border-slate-200 text-slate-800 ${
+                            idx % 2 === 1 ? "bg-slate-50" : "bg-white"
                           }`}
                         >
                           {/* Keterangan */}
@@ -913,7 +913,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                             {isPlaceholder || !hasPrice ? " " : row.qty}
                           </div>
                           {/* Total */}
-                          <div className="w-[20%] text-right pr-4 font-mono font-bold text-zinc-950 text-[9.5px]">
+                          <div className="w-[20%] text-right pr-4 font-mono font-bold text-slate-900 text-[9.5px]">
                             {isPlaceholder || !hasPrice ? " " : formatRupiah(row.price * row.qty)}
                           </div>
                         </div>
@@ -923,7 +923,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
 
                   {/* 2. RENTAL SECTION */}
                   <div className="text-[10px] mt-1">
-                    <div className="font-bold py-1 px-4 bg-white text-zinc-950 select-none">
+                    <div className="font-bold py-1 px-4 bg-white text-slate-900 select-none">
                       Rental
                     </div>
                     
@@ -933,8 +933,8 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                       return (
                         <div
                           key={row.id}
-                          className={`flex justify-between items-center py-1 border-b border-dotted border-zinc-350 text-zinc-900 ${
-                            idx % 2 === 1 ? "bg-zinc-100/60" : "bg-white"
+                          className={`flex justify-between items-center py-1 border-b border-dotted border-slate-200 text-slate-800 ${
+                            idx % 2 === 1 ? "bg-slate-50" : "bg-white"
                           }`}
                         >
                           {/* Keterangan */}
@@ -950,7 +950,7 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                             {isPlaceholder || !hasPrice ? " " : row.qty}
                           </div>
                           {/* Total */}
-                          <div className="w-[20%] text-right pr-4 font-mono font-bold text-zinc-950 text-[9.5px]">
+                          <div className="w-[20%] text-right pr-4 font-mono font-bold text-slate-900 text-[9.5px]">
                             {isPlaceholder || !hasPrice ? " " : formatRupiah(row.price * row.qty)}
                           </div>
                         </div>
@@ -963,40 +963,40 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
                 <div className="grid grid-cols-12 gap-4 items-start pt-2">
                   <div className="col-span-6">
                     {/* Payments Copy */}
-                    <div className="text-[10px] text-zinc-900 space-y-1">
-                      <p className="font-bold text-zinc-950">Pembayaran :</p>
+                    <div className="text-[10px] text-slate-800 space-y-1">
+                      <p className="font-bold text-slate-900">Pembayaran :</p>
                       <div className="grid grid-cols-[55px_1fr] text-[10px] gap-y-0.5">
-                        <span className="text-zinc-650">Nama</span>
-                        <span className="font-bold text-zinc-950">: {accountOwner}</span>
-                        <span className="text-zinc-650">No. Rek</span>
-                        <span className="font-mono font-bold text-zinc-950">: {accountNo}</span>
+                        <span className="text-slate-500">Nama</span>
+                        <span className="font-bold text-slate-900">: {accountOwner}</span>
+                        <span className="text-slate-500">No. Rek</span>
+                        <span className="font-mono font-bold text-slate-900">: {accountNo}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="col-span-6 text-[10px] space-y-1.5 pl-4">
-                    <div className="flex justify-between items-center text-zinc-900 border-b border-zinc-100 pb-0.5">
-                      <span className="font-medium text-zinc-850">Sub Total :</span>
-                      <div className="flex items-center gap-1 font-mono font-bold text-zinc-950">
+                    <div className="flex justify-between items-center text-slate-800 border-b border-slate-100 pb-0.5">
+                      <span className="font-medium text-slate-600">Sub Total :</span>
+                      <div className="flex items-center gap-1 font-mono font-bold text-slate-900">
                         <span>{formatRupiah(subtotal)}</span>
-                        <span className="text-[7px] text-zinc-400">▼</span>
+                        <span className="text-[7px] text-slate-400">▼</span>
                       </div>
                     </div>
                     
                     {downPayment > 0 && (
-                      <div className="flex justify-between items-center text-zinc-900 border-b border-zinc-100 pb-0.5">
-                        <span className="font-medium text-zinc-650">DP Terbayar :</span>
-                        <div className="font-mono text-zinc-600">
+                      <div className="flex justify-between items-center text-slate-800 border-b border-slate-100 pb-0.5">
+                        <span className="font-medium text-slate-500">DP Terbayar :</span>
+                        <div className="font-mono text-slate-600">
                           - {formatRupiah(downPayment)}
                         </div>
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center text-[11px] font-bold text-zinc-950">
-                      <span className="uppercase text-zinc-950">Total :</span>
-                      <div className="flex items-center gap-1 font-mono text-[12px] text-zinc-950">
+                    <div className="flex justify-between items-center text-[11px] font-bold text-slate-900">
+                      <span className="uppercase text-slate-900">Total :</span>
+                      <div className="flex items-center gap-1 font-mono text-[12px] text-slate-900">
                         <span>{formatRupiah(finalTotal - downPayment)}</span>
-                        <span className="text-[7px] text-zinc-400">▼</span>
+                        <span className="text-[7px] text-slate-400">▼</span>
                       </div>
                     </div>
                   </div>
@@ -1008,21 +1008,21 @@ export default function InvoiceGenerator({ events, settings, onBack, lang = "en"
               <div className="pt-2 space-y-3">
                 
                 {/* Terms and Conditions (Light font) */}
-                <div className="text-[8px] text-zinc-500 leading-normal text-center max-w-[340px] mx-auto whitespace-pre-wrap select-none opacity-80 font-sans border-t border-zinc-100 pt-1.5">
+                <div className="text-[8px] text-slate-500 leading-normal text-center max-w-[340px] mx-auto whitespace-pre-wrap select-none opacity-80 font-sans border-t border-slate-100 pt-1.5">
                   {notes}
                 </div>
 
                 {/* Sign Stamp Area */}
                 <div className="flex justify-between pt-2 px-2 text-[10px]">
                   {/* Left Bottom greeting block */}
-                  <div className="text-zinc-900 text-left leading-tight font-black select-none" style={{ fontFamily: "Arial, sans-serif" }}>
-                    <p className="text-zinc-950 uppercase tracking-tight text-[11px]">Terima Kasih Atas</p>
-                    <p className="text-zinc-950 uppercase tracking-tight text-[11px]">Kepercayaan Kalian</p>
-                    <p className="text-zinc-950 uppercase tracking-tight text-[11px]">Telah Memilih Kami</p>
+                  <div className="text-slate-900 text-left leading-tight font-black select-none" style={{ fontFamily: "Arial, sans-serif" }}>
+                    <p className="text-slate-950 uppercase tracking-tight text-[11px]">Terima Kasih Atas</p>
+                    <p className="text-slate-950 uppercase tracking-tight text-[11px]">Kepercayaan Kalian</p>
+                    <p className="text-slate-950 uppercase tracking-tight text-[11px]">Telah Memilih Kami</p>
                   </div>
 
                   <div className="text-center w-[130px] flex flex-col justify-end">
-                    <p className="font-bold text-zinc-950 text-right pr-1" style={{ fontFamily: "Arial, sans-serif" }}>
+                    <p className="font-bold text-slate-900 text-right pr-1" style={{ fontFamily: "Arial, sans-serif" }}>
                       Owner of Lunova
                     </p>
                   </div>

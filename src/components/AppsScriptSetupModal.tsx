@@ -93,6 +93,12 @@ function doGet(e) {
       }
     }
     
+    // Baca kustomisasi biaya per acara langsung dari kolom H, I, J, K pada baris bersangkutan
+    var overrideOperasional = parseRupiahValue(row[7]);
+    var overrideCashback = parseRupiahValue(row[8]);
+    var overrideKaryawan = parseRupiahValue(row[9]);
+    var overrideBensin = parseRupiahValue(row[10]);
+    
     data.push({
       id: "evt-" + i,
       tanggal: tanggalStr,
@@ -100,32 +106,35 @@ function doGet(e) {
       vendor: String(row[2] || "").trim(),
       lokasi: String(row[3] || "").trim(),
       noHp: String(row[4] || "").trim(),
-      pemasukan: pemasukanVal
+      pemasukan: pemasukanVal,
+      operasionalAcara: overrideOperasional,
+      cashback: overrideCashback,
+      karyawanAcara: overrideKaryawan,
+      bensinAcara: overrideBensin
     });
   }
   
-  // Ambil parameter biaya & mitra dari tabel di kolom H, I, J, K
+  // Ambil parameter default biaya global & porsi bagi hasil dari sheet
   var settings = {
-    operasionalAcara: parseRupiahValue(sheet.getRange("I2").getValue()),
-    cashback: parseRupiahValue(sheet.getRange("I3").getValue()),
-    karyawanAcara: parseRupiahValue(sheet.getRange("I5").getValue()),
-    bensinAcara: parseRupiahValue(sheet.getRange("I6").getValue()),
-    pengadaanKeseluruhanKeluar: parseRupiahValue(sheet.getRange("I7").getValue()),
-    partner1Name: String(sheet.getRange("K9").getValue() || "Neovan").trim(),
-    partner1Share: parsePercentageValue(sheet.getRange("J9").getValue(), 40),
-    partner2Name: String(sheet.getRange("K10").getValue() || "Surya").trim(),
-    partner2Share: parsePercentageValue(sheet.getRange("J10").getValue(), 40)
+    operasionalAcara: parseRupiahValue(sheet.getRange("H2").getValue()) || 300000,
+    cashback: parseRupiahValue(sheet.getRange("I2").getValue()) || 100000,
+    karyawanAcara: parseRupiahValue(sheet.getRange("J2").getValue()) || 250000,
+    bensinAcara: parseRupiahValue(sheet.getRange("K2").getValue()) || 25000,
+    pengadaanKeseluruhanKeluar: 340000,
+    partner1Name: String(sheet.getRange("O2").getValue() || "Neovan").trim(),
+    partner1Share: parsePercentageValue(sheet.getRange("N2").getValue(), 40),
+    partner2Name: String(sheet.getRange("O3").getValue() || "Surya").trim(),
+    partner2Share: parsePercentageValue(sheet.getRange("N3").getValue(), 40)
   };
   
   return createJsonResponse({
-  success: true,
-  data: data,
-  settings: settings,
-  lastUpdated: new Date().toISOString(),
-
-  isDemoMode: false,
-  lastSyncedAt: new Date().toISOString()
-});
+    success: true,
+    data: data,
+    settings: settings,
+    lastUpdated: new Date().toISOString(),
+    isDemoMode: false,
+    lastSyncedAt: new Date().toISOString()
+  });
 }
  
 function doPost(e) {
@@ -144,26 +153,34 @@ function doPost(e) {
     if (params.action === "updateSettings") {
       var s = params.settings;
       if (s) {
-        sheet.getRange("H2").setValue("Operasional / acara");
-        if (s.operasionalAcara !== undefined) sheet.getRange("I2").setValue(Number(s.operasionalAcara));
+        // Tulis parameter default ke baris 2
+        if (s.operasionalAcara !== undefined) sheet.getRange("H2").setValue(Number(s.operasionalAcara));
+        if (s.cashback !== undefined) sheet.getRange("I2").setValue(Number(s.cashback));
+        if (s.karyawanAcara !== undefined) sheet.getRange("J2").setValue(Number(s.karyawanAcara));
+        if (s.bensinAcara !== undefined) sheet.getRange("K2").setValue(Number(s.bensinAcara));
         
-        sheet.getRange("H3").setValue("Cashback");
-        if (s.cashback !== undefined) sheet.getRange("I3").setValue(Number(s.cashback));
+        // Update porsi & nama mitra secara seragam di 12 bulan (M, N, O dari baris 2 s.d 25)
+        if (s.partner1Name !== undefined) {
+          for (var m = 0; m < 12; m++) {
+            sheet.getRange("O" + (2 * m + 2)).setValue(String(s.partner1Name));
+          }
+        }
+        if (s.partner1Share !== undefined) {
+          for (var m = 0; m < 12; m++) {
+            sheet.getRange("N" + (2 * m + 2)).setValue(Number(s.partner1Share) / 100);
+          }
+        }
         
-        sheet.getRange("H5").setValue("Karyawan / acara");
-        if (s.karyawanAcara !== undefined) sheet.getRange("I5").setValue(Number(s.karyawanAcara));
-        
-        sheet.getRange("H6").setValue("Bensin / acara");
-        if (s.bensinAcara !== undefined) sheet.getRange("I6").setValue(Number(s.bensinAcara));
-        
-        sheet.getRange("H7").setValue("Pengadaan Keseluruhan Keluar");
-        if (s.pengadaanKeseluruhanKeluar !== undefined) sheet.getRange("I7").setValue(Number(s.pengadaanKeseluruhanKeluar));
-        
-        if (s.partner1Name !== undefined) sheet.getRange("K9").setValue(String(s.partner1Name));
-        if (s.partner1Share !== undefined) sheet.getRange("J9").setValue(Number(s.partner1Share) / 100);
-        
-        if (s.partner2Name !== undefined) sheet.getRange("K10").setValue(String(s.partner2Name));
-        if (s.partner2Share !== undefined) sheet.getRange("J10").setValue(Number(s.partner2Share) / 100);
+        if (s.partner2Name !== undefined) {
+          for (var m = 0; m < 12; m++) {
+            sheet.getRange("O" + (2 * m + 3)).setValue(String(s.partner2Name));
+          }
+        }
+        if (s.partner2Share !== undefined) {
+          for (var m = 0; m < 12; m++) {
+            sheet.getRange("N" + (2 * m + 3)).setValue(Number(s.partner2Share) / 100);
+          }
+        }
         
         return createJsonResponse({ success: true, message: "Pengaturan berhasil diperbarui!" });
       }
@@ -191,17 +208,33 @@ function doPost(e) {
     var noHp = params.noHp || "";
     var pemasukan = Number(params.pemasukan) || 0;
     
-    // Hanya mengisi/menambah baris ke sheet utama (Table 1)
+    // Tarik setting bawaan untuk langsung diisi ke baris baru ini
+    var defaultOperasional = parseRupiahValue(sheet.getRange("H2").getValue()) || 300000;
+    var defaultCashback = parseRupiahValue(sheet.getRange("I2").getValue()) || 100000;
+    var defaultKaryawan = parseRupiahValue(sheet.getRange("J2").getValue()) || 250000;
+    var defaultBensin = parseRupiahValue(sheet.getRange("K2").getValue()) || 25000;
+    
+    var operasional = params.operasionalAcara !== undefined ? Number(params.operasionalAcara) : defaultOperasional;
+    var cashback = params.cashback !== undefined ? Number(params.cashback) : defaultCashback;
+    var karyawan = params.karyawanAcara !== undefined ? Number(params.karyawanAcara) : defaultKaryawan;
+    var bensin = params.bensinAcara !== undefined ? Number(params.bensinAcara) : defaultBensin;
+    
+    // Appending row with spacer column G, operasional H, cashback I, karyawan J, bensin K
     sheet.appendRow([
       inputDate,
       jenisPaket,
       vendor,
       lokasi,
       noHp,
-      pemasukan
+      pemasukan,
+      "",          // Spacer Kolom G
+      operasional, // Kolom H
+      cashback,    // Kolom I
+      karyawan,    // Kolom J
+      bensin       // Kolom K
     ]);
     
-    return createJsonResponse({ success: true, message: "Transaksi baru berhasil ditambahkan ke Table 1!" });
+    return createJsonResponse({ success: true, message: "Transaksi baru berhasil ditambahkan!" });
     
   } catch(err) {
     return createJsonResponse({ success: false, error: err.message });
@@ -354,17 +387,13 @@ function myFunction() {
                   </p>
                 </li>
                 <li>
-                  <p className="font-medium text-zinc-200">Lokasi Setting Operasional & Pengadaan</p>
-                  <p className="text-zinc-400 mt-0.5 font-sans leading-relaxed">
-                    Buat pengaturan variabel di kolom <strong className="text-zinc-200">H & I</strong> pada sheet <strong className="text-blue-400">"Pengisian data"</strong> tersebut:<br />
-                    - Baris 2: <code className="text-blue-400">Operasional / acara</code> di H2, nilainya di I2 (e.g. <code className="text-zinc-300">300000</code>)<br />
-                    - Baris 3: <code className="text-blue-400">Cashback</code> di H3, nilainya di I3 (e.g. <code className="text-zinc-300">100000</code>)<br />
-                    - Baris 5: <code className="text-blue-400">Karyawan / acara</code> di H5, nilainya di I5 (e.g. <code className="text-zinc-300">250000</code>)<br />
-                    - Baris 6: <code className="text-blue-400">Bensin / acara</code> di H6, nilainya di I6 (e.g. <code className="text-zinc-300">25000</code>)<br />
-                    - Baris 7: <code className="text-blue-400">Pengadaan Keseluruhan Keluar</code> di H7, nilainya di I7 (e.g. <code className="text-zinc-300">340000</code>)<br />
-                    - Baris 9 (Mitra 1): Share di <code className="text-blue-400">J9</code> (e.g. <code className="text-zinc-300">40%</code>) dan Nama di <code className="text-blue-400">K9</code> (e.g. <code className="text-zinc-300">Neovan</code>)<br />
-                    - Baris 10 (Mitra 2): Share di <code className="text-blue-400">J10</code> (e.g. <code className="text-zinc-300">40%</code>) dan Nama di <code className="text-blue-400">K10</code> (e.g. <code className="text-zinc-300">Surya</code>)<br />
-                    - Total Keuntungan Bersih: Nilai diatur dan dihitung secara organik real-time berdasarkan akumulasi total dari tiap rincian transaksi persewaan yang ada.<br />
+                  <p className="font-medium text-zinc-200">Ubah Parameter Biaya & Bagi Hasil</p>
+                  <p className="text-zinc-400 mt-0.5 font-sans leading-relaxed text-xs">
+                    Spreadsheet Anda memiliki pengaturan yang terintegrasi secara otomatis:<br />
+                    - <strong>Kolom A - F:</strong> Rincian Data Transaksi (A: Tanggal, B: Jenis Paket, C: Vendor/WO, D: Lokasi, E: No. Handphone / WA, F: Pemasukan/Event).<br />
+                    - <strong>Kolom H - K:</strong> Parameter biaya per-acara (H: Operasional / acara, I: Cashback, J: Karyawan / acara, K: Bensin / acara). Baris pertama diisi sebagai basis bawaan saat input baru.<br />
+                    - <strong>Kolom M - O (Bagi Hasil):</strong> Pengaturan nama mitra & persentase bagi hasil per-bulan (Baris 2-25 diisi untuk 12 Bulan, dengan row genap untuk Partner 1 dan ganjil untuk Partner 2).<br />
+                    - Pembagian porsi bersih akan langsung terhitung secara otomatis di web berdasarkan pencantuman data per-baris spreadsheet ini.
                   </p>
                 </li>
                 <li>

@@ -164,7 +164,7 @@ export function getDashboardTotals(events: EventData[], settings: CostSettings) 
   
   // General procurement is subtracted from the Kas/Enterprise pool or listed as an overhead cost
   const overheadCost = settings.pengadaanKeseluruhanKeluar;
-  const finalKas = totalSisaOperasional;
+  const finalKas = totalKasShare + (settings.kasTambahan || 0);
   
   return {
     totalRevenue,
@@ -299,5 +299,6 @@ export const DEFAULT_SETTINGS: CostSettings = {
   partner1Name: "Neovan",
   partner1Share: 40,
   partner2Name: "Surya",
-  partner2Share: 40
+  partner2Share: 40,
+  kasTambahan: 0
 };

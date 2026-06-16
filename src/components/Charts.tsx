@@ -22,6 +22,38 @@ interface ChartsProps {
 export default function Charts({ events, settings, lang = "en", selectedYear, setSelectedYear }: ChartsProps) {
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
   const [activeDonutSegment, setActiveDonutSegment] = useState<string | null>(null);
+  const [selectedShareMonth, setSelectedShareMonth] = useState<string>("all");
+  const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  const updateMonthlyShare = (partner: "p1" | "p2", newValue: string) => {
+    try {
+      const saved = localStorage.getItem("lighting_monthly_shares_override_v2");
+      const currentOverrides: Record<string, { p1: string; p2: string }> = saved ? JSON.parse(saved) : {};
+      
+      const yearToUpdate = selectedYear === "all" ? "2026" : selectedYear;
+      
+      if (selectedShareMonth === "all") {
+        for (let m = 0; m < 12; m++) {
+          const key = `${yearToUpdate}_${m}`;
+          if (!currentOverrides[key]) {
+            currentOverrides[key] = { p1: "40%", p2: "40%" };
+          }
+          currentOverrides[key][partner] = newValue;
+        }
+      } else {
+        const key = `${yearToUpdate}_${selectedShareMonth}`;
+        if (!currentOverrides[key]) {
+          currentOverrides[key] = { p1: "40%", p2: "40%" };
+        }
+        currentOverrides[key][partner] = newValue;
+      }
+      
+      localStorage.setItem("lighting_monthly_shares_override_v2", JSON.stringify(currentOverrides));
+      setUpdateTrigger(prev => prev + 1);
+    } catch (e) {
+      // Ignored
+    }
+  };
 
   // Generate a range of years starting from 2026 up to 2035, and merge with any dynamic years from events
   const defaultYears = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035];
@@ -92,7 +124,7 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
     try {
       const parsed = JSON.parse(savedV2);
       for (let index = 0; index < 12; index++) {
-        const key = `${selectedYear}_${index}`;
+        const key = `${selectedYear === "all" ? "2026" : selectedYear}_${index}`;
         if (parsed[key]) {
           monthlyShares[index] = parsed[key];
         }
@@ -134,6 +166,9 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
   }
 
   for (let index = 0; index < 12; index++) {
+    if (selectedShareMonth !== "all" && Number(selectedShareMonth) !== index) {
+      continue;
+    }
     const monthEvents = events.filter((evt) => {
       if (!evt.tanggal) return false;
       const dat = parseDate(evt.tanggal);
@@ -194,6 +229,18 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
   const p1Pct = totalNetProfit > 0 ? (p1ShareAmt / totalNetProfit) * 100 : 0;
   const p2Pct = totalNetProfit > 0 ? (p2ShareAmt / totalNetProfit) * 100 : 0;
   const kasPct = totalNetProfit > 0 ? (kasShareAmt / totalNetProfit) * 100 : 0;
+
+  let currentP1Val = "40%";
+  let currentP2Val = "40%";
+
+  if (selectedShareMonth !== "all") {
+    const idx = Number(selectedShareMonth);
+    currentP1Val = monthlyShares[idx]?.p1 ?? "40%";
+    currentP2Val = monthlyShares[idx]?.p2 ?? "40%";
+  } else {
+    currentP1Val = monthlyShares[0]?.p1 ?? "40%";
+    currentP2Val = monthlyShares[0]?.p2 ?? "40%";
+  }
 
   // Vendor statistics
   const vendorMap: Record<string, { revenue: number; count: number }> = {};
@@ -363,9 +410,25 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
       {/* 2. Profit Sharing Distribution (Pie Representation) */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-between">
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-4 h-4 text-purple-400" />
-            <h3 className="text-base font-bold text-zinc-100">{t.chartContributionTitle}</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4 border-b border-zinc-850 pb-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-400" />
+              <h3 className="text-base font-bold text-zinc-100">{t.chartContributionTitle}</h3>
+            </div>
+            
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-zinc-500 font-mono font-bold uppercase tracking-wider">{lang === "en" ? "Month:" : "Bulan:"}</span>
+              <select
+                value={selectedShareMonth}
+                onChange={(e) => setSelectedShareMonth(e.target.value)}
+                className="bg-zinc-950 border border-zinc-805 rounded-lg px-2.5 py-1 text-[11px] text-zinc-350 outline-none focus:border-purple-500 font-semibold cursor-pointer min-w-[110px]"
+              >
+                <option value="all">{lang === "en" ? "All Months" : "Semua Bulan"}</option>
+                {monthNames.map((name, idx) => (
+                  <option key={idx} value={String(idx)}>{name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <p className="text-xs text-zinc-400 mb-6">
             {t.chartContributionSub}
@@ -458,9 +521,15 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded bg-[#ff758f] block" />
                 <span className="text-xs font-semibold text-zinc-200">{settings.partner1Name}</span>
-                <span className="text-[10px] font-bold text-[#ff758f] bg-[#ff758f]/10 px-1.5 py-0.2 rounded font-mono">
-                  {Math.round(p1Pct)}%
-                </span>
+                <select
+                  value={currentP1Val}
+                  onChange={(e) => updateMonthlyShare("p1", e.target.value)}
+                  className="bg-zinc-950 border border-[#ff758f]/30 hover:border-[#ff758f]/60 text-[#ff758f] text-[10px] font-bold px-1.5 py-0.5 rounded font-mono outline-none cursor-pointer focus:ring-1 focus:ring-[#ff758f]/50"
+                >
+                  <option value="40%" className="bg-zinc-950 text-zinc-350">40% ({Math.round(p1Pct)}%)</option>
+                  <option value="500" className="bg-zinc-950 text-zinc-350">{lang === "en" ? "500k Flat" : "Rp500rb Flat"}</option>
+                  <option value="1000" className="bg-zinc-950 text-zinc-350">{lang === "en" ? "1M Flat" : "Rp1jt Flat"}</option>
+                </select>
               </div>
               <span className="text-xs font-semibold text-zinc-100 font-mono">
                 {formatRupiah(p1ShareAmt)}
@@ -476,9 +545,15 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded bg-[#5ea2ff] block" />
                 <span className="text-xs font-semibold text-[#bebfc6]">{settings.partner2Name}</span>
-                <span className="text-[10px] font-bold text-[#5ea2ff] bg-[#5ea2ff]/10 px-1.5 py-0.2 rounded font-mono">
-                  {Math.round(p2Pct)}%
-                </span>
+                <select
+                  value={currentP2Val}
+                  onChange={(e) => updateMonthlyShare("p2", e.target.value)}
+                  className="bg-zinc-950 border border-[#5ea2ff]/30 hover:border-[#5ea2ff]/60 text-[#5ea2ff] text-[10px] font-bold px-1.5 py-0.5 rounded font-mono outline-none cursor-pointer focus:ring-1 focus:ring-[#5ea2ff]/50"
+                >
+                  <option value="40%" className="bg-zinc-950 text-zinc-350">40% ({Math.round(p2Pct)}%)</option>
+                  <option value="500" className="bg-zinc-950 text-zinc-350">{lang === "en" ? "500k Flat" : "Rp500rb Flat"}</option>
+                  <option value="1000" className="bg-zinc-950 text-zinc-300">{lang === "en" ? "1M Flat" : "Rp1jt Flat"}</option>
+                </select>
               </div>
               <span className="text-xs font-semibold text-zinc-100 font-mono">
                 {formatRupiah(p2ShareAmt)}
@@ -494,8 +569,8 @@ export default function Charts({ events, settings, lang = "en", selectedYear, se
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded bg-[#f2a154] block" />
                 <span className="text-xs font-semibold text-[#bebfc6]">{lang === "en" ? "Enterprise Kas" : "Kas Usaha"}</span>
-                <span className="text-[10px] font-bold text-[#f2a154] bg-[#f2a154]/10 px-1.5 py-0.2 rounded font-mono">
-                  {Math.round(kasPct)}%
+                <span className="text-[10px] font-bold text-[#f2a154] bg-[#f2a154]/10 px-1.5 py-0.5 rounded font-mono" title={lang === "en" ? "Adjusts automatically" : "Menyesuaikan otomatis"}>
+                  {Math.round(kasPct)}% {lang === "en" ? "(Auto)" : "(Sisa)"}
                 </span>
               </div>
               <span className="text-xs font-semibold text-zinc-100 font-mono">
