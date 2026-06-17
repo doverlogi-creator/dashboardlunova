@@ -23,7 +23,7 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const isPresetPackage = ["Paket 1", "Paket 1 C", "Paket 2", "Paket 2 C", "Paket 3", "Paket 3 C"].includes(jenisPaket);
+  const isPresetPackage = ["Paket 1", "Paket 2", "Paket 3"].includes(jenisPaket);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -114,11 +114,8 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
                     setJenisPaket(val);
                     const presetPrices: Record<string, number> = {
                       "Paket 1": 1500000,
-                      "Paket 1 C": 1500000,
                       "Paket 2": 2750000,
-                      "Paket 2 C": 2750000,
                       "Paket 3": 3500000,
-                      "Paket 3 C": 3500000,
                     };
                     if (presetPrices[val] !== undefined) {
                       setPemasukan(String(presetPrices[val]));
@@ -129,13 +126,9 @@ export default function AddEventModal({ onClose, onAddEvent, events }: AddEventM
                   } rounded-xl pl-10 pr-4 py-3 text-sm text-zinc-250 outline-none transition-colors`}
                 >
                   <option value="Paket 1">Paket 1</option>
-                  <option value="Paket 1 C">Paket 1 C</option>
                   <option value="Paket 2">Paket 2</option>
-                  <option value="Paket 2 C">Paket 2 C</option>
                   <option value="Paket 3">Paket 3</option>
-                  <option value="Paket 3 C">Paket 3 C</option>
                   <option value="Custom">Custom</option>
-                  <option value="Custom C">Custom C</option>
                 </select>
               </div>
               {errors.jenisPaket && <p className="text-[11px] text-red-500 font-medium">{errors.jenisPaket}</p>}

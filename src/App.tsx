@@ -5,35 +5,27 @@
 
 import { useState, useEffect } from "react";
 import {
-  Activity,
-  Cloud,
+  Briefcase,
   CloudLightning,
   Coins,
   Cpu,
   Database,
-  Download,
-  FileText,
   Info,
-  Layers,
-  LifeBuoy,
   Plus,
   RefreshCw,
   Sliders,
   Sparkles,
-  TrendingDown,
   TrendingUp,
-  User,
-  Users,
   Wallet,
-  Wifi,
-  WifiOff,
   Zap,
-  LayoutDashboard,
   Settings,
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  ChevronDown,
+  ChevronRight,
+  Circle
 } from "lucide-react";
 
 import { EventData, CostSettings, AppsScriptConfig, ProcurementItem } from "./types";
@@ -48,6 +40,8 @@ import AddEventModal from "./components/AddEventModal";
 import AppsScriptSetupModal from "./components/AppsScriptSetupModal";
 import InvoiceGenerator from "./components/InvoiceGenerator";
 import ProcurementManagement from "./components/ProcurementManagement";
+import CashbackManagement from "./components/CashbackManagement";
+import OperationalManagement from "./components/OperationalManagement";
 
 const DEFAULT_PROCUREMENTS: ProcurementItem[] = [
   {
@@ -62,7 +56,8 @@ const DEFAULT_PROCUREMENTS: ProcurementItem[] = [
 
 export default function App() {
   // --- STATES ---
-  const [activeView, setActiveView] = useState<"dashboard" | "mitra-kinerja" | "pembagian-bulan" | "invoice" | "procurement" | "settings">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "mitra-kinerja" | "pembagian-bulan" | "invoice" | "procurement" | "cashback" | "operational" | "settings">("dashboard");
+  const [isGroupDataOpen, setIsGroupDataOpen] = useState(true);
   const [selectedYear, setSelectedYear] = useState<string>(() => {
     const currentYearStr = String(new Date().getFullYear());
     const defaultYears = ["2026", "2027", "2028", "2029", "2030", "2031", "2032", "2033", "2034", "2035"];
@@ -95,7 +90,6 @@ export default function App() {
   const [isSetupGasOpen, setIsSetupGasOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
   // --- THEME INITIAL COUPLING ---
   useEffect(() => {
@@ -276,6 +270,16 @@ export default function App() {
     saveProcurementsLocally(updated);
   };
 
+  const handleUpdateEvent = (updatedEv: EventData) => {
+    const updatedEvents = events.map((ev) => {
+      if (ev.id === updatedEv.id) {
+        return updatedEv;
+      }
+      return ev;
+    });
+    saveEventsLocally(updatedEvents);
+  };
+
   const updateSpecificEventCost = (field: keyof EventData, value: number) => {
     if (!editingCostEvent) return;
     const updatedEv = { ...editingCostEvent, [field]: value };
@@ -325,6 +329,8 @@ export default function App() {
               ...syncEvt,
               operasionalAcara: syncEvt.operasionalAcara !== undefined ? syncEvt.operasionalAcara : localEvt.operasionalAcara,
               cashback: syncEvt.cashback !== undefined ? syncEvt.cashback : localEvt.cashback,
+              cashbackDibayar: syncEvt.cashbackDibayar !== undefined ? syncEvt.cashbackDibayar : localEvt.cashbackDibayar,
+              operasionalDibayar: syncEvt.operasionalDibayar !== undefined ? syncEvt.operasionalDibayar : localEvt.operasionalDibayar,
               karyawanAcara: syncEvt.karyawanAcara !== undefined ? syncEvt.karyawanAcara : localEvt.karyawanAcara,
               bensinAcara: syncEvt.bensinAcara !== undefined ? syncEvt.bensinAcara : localEvt.bensinAcara,
             };
@@ -346,6 +352,7 @@ export default function App() {
             partner2Name: rawJson.settings.partner2Name || settings.partner2Name || DEFAULT_SETTINGS.partner2Name,
             partner2Share: Number(rawJson.settings.partner2Share) || settings.partner2Share || DEFAULT_SETTINGS.partner2Share,
             kasTambahan: rawJson.settings.kasTambahan !== undefined ? Number(rawJson.settings.kasTambahan) : (settings.kasTambahan || 0),
+            saldoRekeningRiil: rawJson.settings.saldoRekeningRiil !== undefined ? Number(rawJson.settings.saldoRekeningRiil) : (settings.saldoRekeningRiil || 0),
           };
           saveSettingsLocally(mergedSettings);
         }
@@ -583,6 +590,7 @@ export default function App() {
     return d.getFullYear() === Number(selectedYear);
   });
   const totals = getDashboardTotals(filteredEvents, settings);
+  const totalSpending = procurements.reduce((sum, item) => sum + (item.harga * item.jumlah), 0);
   const t = translations[lang];
 
   return (
@@ -687,95 +695,198 @@ export default function App() {
         </div>
 
         {/* Navigation Section */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          <button
-            onClick={() => {
-              setActiveView("dashboard");
-              setIsSidebarOpen(false);
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
-              activeView === "dashboard"
-                ? "bg-blue-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-            }`}
-          >
-            <span>{t.navDashboard}</span>
-          </button>
+        <nav className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
+          {/* Dashboard (Root Navigation) */}
+          <div className="space-y-1">
+            <button
+              onClick={() => {
+                setActiveView("dashboard");
+                setIsSidebarOpen(false);
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
+                activeView === "dashboard"
+                  ? "bg-blue-600 text-white shadow"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              }`}
+            >
+              <span>{t.navDashboard}</span>
+            </button>
+          </div>
 
-          <button
-            onClick={() => {
-              setActiveView("mitra-kinerja");
-              setIsSidebarOpen(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
-              activeView === "mitra-kinerja"
-                ? "bg-purple-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-            }`}
-          >
-            <span>{t.navManageEvents}</span>
-          </button>
+          {/* GROUP: DATA & OPERASIONAL */}
+          {(() => {
+            const isDataActive = activeView === "mitra-kinerja" || activeView === "procurement" || activeView === "cashback" || activeView === "operational";
 
-          <button
-            onClick={() => {
-              setActiveView("pembagian-bulan");
-              setIsSidebarOpen(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
-              activeView === "pembagian-bulan"
-                ? "bg-amber-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-            }`}
-          >
-            <span>{t.navProfitSharing}</span>
-          </button>
+            return (
+              <div className="space-y-1">
+                <button
+                  onClick={() => setIsGroupDataOpen(!isGroupDataOpen)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold tracking-wider transition-all duration-150 cursor-pointer ${
+                    isDataActive
+                      ? "text-cyan-400 bg-cyan-600/5 border-l-2 border-cyan-500 pl-2"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30 pl-2.5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Database className={`w-4 h-4 shrink-0 transition-colors ${isDataActive ? "text-cyan-400" : "text-zinc-500"}`} />
+                    <span>{lang === "en" ? "DATA & OPERASIONAL" : "DATA & OPERASIONAL"}</span>
+                  </div>
+                  {isGroupDataOpen ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
+                  )}
+                </button>
 
-          <button
-            onClick={() => {
-              setActiveView("invoice");
-              setIsSidebarOpen(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
-              activeView === "invoice"
-                ? "bg-emerald-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-            }`}
-          >
-            <span>{t.navInvoice}</span>
-          </button>
+                {isGroupDataOpen && (
+                  <div className="pl-4 mt-1 space-y-0.5 border-l border-zinc-800/40 ml-5">
+                    {/* Sub Item 1: Mitra Kinerja */}
+                    <button
+                      onClick={() => {
+                        setActiveView("mitra-kinerja");
+                        setIsSidebarOpen(false);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                        activeView === "mitra-kinerja"
+                          ? "text-purple-400 bg-purple-600/10 font-extrabold"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/20"
+                      }`}
+                    >
+                      <div className="relative flex items-center justify-center w-3.5 h-3.5">
+                        {activeView === "mitra-kinerja" ? (
+                          <Circle className="w-2 h-2 fill-purple-500 text-purple-400 scale-110" />
+                        ) : (
+                          <Circle className="w-1.5 h-1.5 text-zinc-600 hover:text-zinc-400" />
+                        )}
+                      </div>
+                      <span>{t.navManageEvents}</span>
+                    </button>
 
-          <button
-            onClick={() => {
-              setActiveView("procurement");
-              setIsSidebarOpen(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
-              activeView === "procurement"
-                ? "bg-cyan-600 text-white shadow"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-            }`}
-          >
-            <span>{lang === "en" ? "PROCUREMENT" : "PENGADAAN"}</span>
-          </button>
+                    {/* Sub Item 2: Procurement */}
+                    <button
+                      onClick={() => {
+                        setActiveView("procurement");
+                        setIsSidebarOpen(false);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                        activeView === "procurement"
+                          ? "text-cyan-400 bg-cyan-600/10 font-extrabold"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/20"
+                      }`}
+                    >
+                      <div className="relative flex items-center justify-center w-3.5 h-3.5">
+                        {activeView === "procurement" ? (
+                          <Circle className="w-2 h-2 fill-cyan-500 text-cyan-400 scale-110" />
+                        ) : (
+                          <Circle className="w-1.5 h-1.5 text-zinc-600 hover:text-zinc-400" />
+                        )}
+                      </div>
+                      <span>{lang === "en" ? "PROCUREMENT" : "PENGADAAN"}</span>
+                    </button>
 
-          <button
-            onClick={() => {
-              setActiveView("settings");
-              setIsSidebarOpen(false);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
-              activeView === "settings"
-                ? "bg-zinc-850 text-blue-400 border border-zinc-700/50"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent"
-            }`}
-          >
-            <span>{t.navSettings}</span>
-          </button>
+                    {/* Sub Item 3: Cashback */}
+                    <button
+                      onClick={() => {
+                        setActiveView("cashback");
+                        setIsSidebarOpen(false);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                        activeView === "cashback"
+                          ? "text-amber-400 bg-amber-600/10 font-extrabold"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/20"
+                      }`}
+                    >
+                      <div className="relative flex items-center justify-center w-3.5 h-3.5">
+                        {activeView === "cashback" ? (
+                          <Circle className="w-2 h-2 fill-amber-500 text-amber-400 scale-110" />
+                        ) : (
+                          <Circle className="w-1.5 h-1.5 text-zinc-600 hover:text-zinc-400" />
+                        )}
+                      </div>
+                      <span>{t.navCashback}</span>
+                    </button>
+
+                    {/* Sub Item 4: Operational */}
+                    <button
+                      onClick={() => {
+                        setActiveView("operational");
+                        setIsSidebarOpen(false);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                        activeView === "operational"
+                          ? "text-cyan-400 bg-cyan-600/10 font-extrabold"
+                          : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/20"
+                      }`}
+                    >
+                      <div className="relative flex items-center justify-center w-3.5 h-3.5">
+                        {activeView === "operational" ? (
+                          <Circle className="w-2 h-2 fill-cyan-500 text-cyan-400 scale-110" />
+                        ) : (
+                          <Circle className="w-1.5 h-1.5 text-zinc-600 hover:text-zinc-400" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 justify-between w-full">
+                        <span>{lang === "en" ? "OPERATIONAL" : "OPERASIONAL"}</span>
+                        <span className="text-[10px] bg-zinc-950/40 text-cyan-400 font-bold px-1.5 py-0.5 rounded border border-cyan-500/20 leading-none">NEW</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Root Navigation and Settings */}
+          <div className="space-y-1">
+            <button
+              onClick={() => {
+                setActiveView("pembagian-bulan");
+                setIsSidebarOpen(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
+                activeView === "pembagian-bulan"
+                  ? "bg-amber-600 text-white shadow"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              }`}
+            >
+              <span>{t.navProfitSharing}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveView("invoice");
+                setIsSidebarOpen(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
+                activeView === "invoice"
+                  ? "bg-emerald-600 text-white shadow"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              }`}
+            >
+              <span>{t.navInvoice}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveView("settings");
+                setIsSidebarOpen(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-150 cursor-pointer ${
+                activeView === "settings"
+                  ? "bg-zinc-850 text-blue-400 border border-zinc-700/55"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent"
+              }`}
+            >
+              <span>{t.navSettings}</span>
+            </button>
+          </div>
         </nav>
 
         {/* Sidebar Footer */}
@@ -884,14 +995,18 @@ export default function App() {
               />
 
               <StatCard
-                id="kpi-kas"
-                title={t.kpiOverhead}
-                value={totals.finalKas}
-                icon={<Layers className="w-5 h-5" />}
-                colorClass="text-cyan-400"
-                description={t.kpiOverheadDesc}
-                badgeText="Kas"
-                badgeColorClass="bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                id="proc-items-count"
+                title={lang === "en" ? "Remaining Enterprise Kas" : "Sisa Kas Usaha"}
+                value={totals.totalKasShare + (settings.kasTambahan || 0) - totalSpending}
+                icon={<Briefcase className="w-5 h-5" />}
+                colorClass="text-blue-400"
+                description={
+                  lang === "en" 
+                    ? `Total: ${formatRupiah(totals.totalKasShare + (settings.kasTambahan || 0))} - Spent: ${formatRupiah(totalSpending)}` 
+                    : `Total: ${formatRupiah(totals.totalKasShare + (settings.kasTambahan || 0))} - Belanja: ${formatRupiah(totalSpending)}`
+                }
+                badgeText={lang === "en" ? "Remaining" : "Sisa"}
+                badgeColorClass="bg-blue-500/10 text-blue-400 border-blue-500/20"
               />
             </div>
             {/* --- GRAPHS SECTION (Bento Box Section 1) --- */}
@@ -1022,6 +1137,33 @@ export default function App() {
               onUpdateKasTambahan={(val: number) => saveSettingsLocally({ ...settings, kasTambahan: val })}
               onAddProcurement={handleAddProcurement}
               onDeleteProcurement={handleDeleteProcurement}
+              settings={settings}
+              onUpdateSettings={saveSettingsLocally}
+              lang={lang}
+            />
+          </div>
+        )}
+
+        {activeView === "cashback" && (
+          <div className="animate-fadeIn">
+            <CashbackManagement
+              events={filteredEvents}
+              settings={settings}
+              onUpdateEvent={handleUpdateEvent}
+              onUpdateSettings={saveSettingsLocally}
+              lang={lang}
+              procurements={procurements}
+            />
+          </div>
+        )}
+
+        {activeView === "operational" && (
+          <div className="animate-fadeIn">
+            <OperationalManagement
+              events={events}
+              settings={settings}
+              onUpdateEvent={handleUpdateEvent}
+              onUpdateSettings={saveSettingsLocally}
               lang={lang}
             />
           </div>

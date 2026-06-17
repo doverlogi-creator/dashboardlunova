@@ -7,6 +7,7 @@ export const translations = {
     navManageEvents: "MANAGE EVENTS",
     navProfitSharing: "PROFIT SHARING",
     navInvoice: "INVOICE",
+    navCashback: "CASHBACK",
     navSettings: "SETTINGS",
 
     // Dashboard General
@@ -22,8 +23,8 @@ export const translations = {
     kpiMonthsCount: "Months",
     kpiTotalNetProfit: "Total Cashback",
     kpiTotalNetProfitDesc: "Total cashback recorded from package events",
-    kpiOverhead: "Enterprise Kas Pool",
-    kpiOverheadDesc: "Total enterprise savings fund with manual additions",
+    kpiOverhead: "Remaining Enterprise Kas",
+    kpiOverheadDesc: "Remaining enterprise savings after procurement spending",
     kpiRemainingProfit: "Total Cashback",
 
     // Common / Notifications
@@ -171,6 +172,7 @@ export const translations = {
     navManageEvents: "KELOLA EVENT",
     navProfitSharing: "BAGI HASIL",
     navInvoice: "INVOICE",
+    navCashback: "CASHBACK",
     navSettings: "PENGATURAN",
 
     // Dashboard General
@@ -186,8 +188,8 @@ export const translations = {
     kpiMonthsCount: "Bulan",
     kpiTotalNetProfit: "Total Cashback",
     kpiTotalNetProfitDesc: "Dihitung dari jumlah total cashback yang telah tercatat",
-    kpiOverhead: "Total Kas Usaha",
-    kpiOverheadDesc: "Total dana kas simpanan beserta tambahan manual",
+    kpiOverhead: "Sisa Kas Usaha",
+    kpiOverheadDesc: "Sisa dana kas simpanan setelah dikurangi belanja modal/pengadaan",
     kpiRemainingProfit: "Total Cashback",
 
     // Common / Notifications

@@ -15,6 +15,8 @@ export interface EventData {
   // Custom overrides per event (optional)
   operasionalAcara?: number;
   cashback?: number;
+  cashbackDibayar?: boolean;
+  operasionalDibayar?: boolean;
   karyawanAcara?: number;
   bensinAcara?: number;
 }
@@ -32,6 +34,7 @@ export interface CostSettings {
   partner2Name: string; // "Surya"
   partner2Share: number; // 40 (%)
   kasTambahan?: number; // raw value for manual capital/kas additions
+  saldoRekeningRiil?: number; // actual bank balance
 }
 
 export interface AppsScriptConfig {

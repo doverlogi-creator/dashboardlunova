@@ -84,11 +84,12 @@ export function getEventFinances(event: EventData, settings: CostSettings) {
   const customKaryawan = event.karyawanAcara !== undefined ? event.karyawanAcara : settings.karyawanAcara;
   const customBensin = event.bensinAcara !== undefined ? event.bensinAcara : settings.bensinAcara;
   
-  // Package cashback only applies if the package name ends with 'C' (case-insensitive)
-  const packageType = (event.jenisPaket || "").trim();
-  const hasCAtEnd = packageType.endsWith("C") || packageType.endsWith("c");
+  // Package cashback applies to Paket 1, Paket 2, Paket 3 (or any package that is not Custom).
+  // If the package is Custom, cashback only applies if explicitly overridden via event.cashback.
+  const packageType = (event.jenisPaket || "").trim().toLowerCase();
+  const isPresetPackage = packageType.startsWith("paket");
   const cashbackSetting = event.cashback !== undefined ? event.cashback : settings.cashback;
-  const cashback = hasCAtEnd ? cashbackSetting : 0;
+  const cashback = (isPresetPackage || event.cashback !== undefined) ? cashbackSetting : 0;
   
   const runningCost = customOperational + cashback;
   const revenue = event.pemasukan;
@@ -300,5 +301,6 @@ export const DEFAULT_SETTINGS: CostSettings = {
   partner1Share: 40,
   partner2Name: "Surya",
   partner2Share: 40,
-  kasTambahan: 0
+  kasTambahan: 0,
+  saldoRekeningRiil: 0
 };
