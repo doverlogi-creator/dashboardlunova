@@ -23,7 +23,8 @@ import {
   Search,
   Filter,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  Hourglass
 } from "lucide-react";
 
 interface OperationalManagementProps {
@@ -65,6 +66,7 @@ export default function OperationalManagement({
   let totalBensin = 0;
   let totalKaryawan = 0;
   let customOverridesCount = 0;
+  let totalBebanLunas = 0;
 
   events.forEach((evt) => {
     const ops = evt.operasionalAcara !== undefined ? evt.operasionalAcara : settings.operasionalAcara;
@@ -75,13 +77,17 @@ export default function OperationalManagement({
     totalBensin += bensin;
     totalKaryawan += karyawan;
 
-    if (evt.operasionalAcara !== undefined || evt.bensinAcara !== undefined || evt.karyawanAcara !== undefined) {
+    if (evt.operasionalDibayar) {
+      totalBebanLunas += (bensin + karyawan);
+    }
+
+    if (evt.bensinAcara !== undefined || evt.karyawanAcara !== undefined) {
       customOverridesCount++;
     }
   });
 
-  const grandTotalOperational = totalOps + totalBensin + totalKaryawan;
-  const avgOperationalPerEvent = events.length > 0 ? grandTotalOperational / events.length : 0;
+  const grandTotalOperational = totalOps;
+  const sisaOperasional = totalOps - totalBebanLunas;
 
   // Handler to adjust custom operational values for specific event
   const handleStartEditEvent = (evt: EventData) => {
@@ -207,12 +213,12 @@ export default function OperationalManagement({
 
         <StatCard
           id="ops-avg-per-event"
-          title={lang === "en" ? "Average cost per event" : "Rata-rata per Event"}
-          value={formatRupiah(avgOperationalPerEvent)}
-          description={lang === "en" ? `Based on ${events.length} transactions` : `Dihitung dari ${events.length} acara`}
-          icon={<Coins className="w-5 h-5 text-emerald-400" />}
-          badgeText={lang === "en" ? "Performance" : "Kinerja"}
-          badgeColorClass="bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+          title={lang === "en" ? "Remaining Ops Balance" : "Sisa Operasional (Belum Bayar)"}
+          value={formatRupiah(sisaOperasional)}
+          description={lang === "en" ? "Unpaid event operating amounts" : "Biaya operasional acara belum lunas"}
+          icon={<Hourglass className="w-5 h-5 text-rose-450 animate-pulse" />}
+          badgeText={lang === "en" ? "Pending" : "Belum Bayar"}
+          badgeColorClass="bg-rose-500/10 text-rose-450 border-rose-500/20"
         />
       </div>
 
@@ -335,33 +341,6 @@ export default function OperationalManagement({
             )}
           </div>
 
-          {/* EDUCATIONAL DOCUMENTATION CARD */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 animate-fadeIn">
-            <div className="flex items-center gap-2 mb-3">
-              <HelpCircle className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-sm font-bold text-zinc-100">
-                {lang === "en" ? "Operational Allocation Rules" : "Aturan Beban Operasional"}
-              </h3>
-            </div>
-            
-            <p className="text-xs text-zinc-400 leading-relaxed mb-3">
-              {lang === "en" 
-                ? "Operating parameters define how rent revenues are divided among operational pools. If an event has a special high transport distance or extra crew requirement, you can customize those parameters directly in the event row." 
-                : "Biaya ini secara otomatis memotong perolehan persewaan kotor sebelum laba bersih dibagi rata atau dialokasikan sebagai deviden. Silakan sesuaikan baris event apabila diperlukan bensin tambahan atau jumlah kru berbeda."}
-            </p>
-
-            <div className="space-y-2 mt-2 bg-zinc-950 border border-zinc-850 rounded-xl p-3 text-[11px] font-mono leading-relaxed">
-              <span className="text-zinc-500 block border-b border-zinc-900 pb-1 mb-1 font-bold uppercase">
-                {lang === "en" ? "FORMULA CHEATSHEET" : "DOKUMENTASI ALUR"}
-              </span>
-              <div className="space-y-1 text-zinc-400">
-                <p>Gross Rent = Pemasukan Acara</p>
-                <p className="text-cyan-400 font-semibold">Running Cost = Ops + Bensin + Gaji</p>
-                <p>Net Profit = Gross Rent - Running Cost</p>
-                <p className="text-purple-400 font-bold">Dividends = Net Profit * Share %</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* RIGHT COLUMN: EVENTS TABLE WITH DIRECT OPERATIONAL MODIFICATION */}
@@ -381,39 +360,6 @@ export default function OperationalManagement({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-zinc-950 hover:bg-zinc-900 focus:bg-zinc-950 border border-zinc-850 focus:border-cyan-500 rounded-xl text-xs font-semibold text-zinc-200 placeholder-zinc-650 transition-all outline-none"
                 />
-              </div>
-
-              <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0">
-                <button
-                  onClick={() => setFilterType("all")}
-                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                    filterType === "all"
-                      ? "bg-cyan-600 border-cyan-500 text-white"
-                      : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                  }`}
-                >
-                  {lang === "en" ? "All Events" : "Semua Acara"}
-                </button>
-                <button
-                  onClick={() => setFilterType("default")}
-                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                    filterType === "default"
-                      ? "bg-cyan-600 border-cyan-500 text-white"
-                      : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                  }`}
-                >
-                  {lang === "en" ? "Default Ops" : "Ops Standar"}
-                </button>
-                <button
-                  onClick={() => setFilterType("custom")}
-                  className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                    filterType === "custom"
-                      ? "bg-cyan-600 border-cyan-500 text-white"
-                      : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                  }`}
-                >
-                  {lang === "en" ? "Overrides" : "Kustomisasi"}
-                </button>
               </div>
             </div>
 
@@ -517,7 +463,7 @@ export default function OperationalManagement({
 
                           {/* Grand total running cost for the event */}
                           <td className="py-4 px-3 text-right font-mono font-bold text-zinc-100">
-                            {formatRupiah(opsVal + bensinVal + karyawanVal)}
+                            {formatRupiah(bensinVal + karyawanVal)}
                             {hasOverride && (
                               <span className="block text-[8px] text-cyan-400 tracking-wider font-extrabold uppercase mt-0.5">
                                 OVERRIDDEN

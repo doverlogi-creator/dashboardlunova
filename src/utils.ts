@@ -102,8 +102,10 @@ export function getEventFinances(event: EventData, settings: CostSettings) {
   const p2Share = netProfit * (settings.partner2Share / 100);
   const kasShare = netProfit - (p1Share + p2Share);
   
-  // Sisa Operasional = operasional acara - karyawan/acara - bensin/acara
-  const sisaOperasional = customOperational - customKaryawan - customBensin;
+  // Sisa Operasional = Total Biaya Operasional (Ops Acara) - Jumlah Seluruh Total Beban (Uang Bensin + Gaji Kru) yang sudah lunas
+  const sisaOperasional = event.operasionalDibayar
+    ? customOperational - (customKaryawan + customBensin)
+    : customOperational;
   
   return {
     revenue,
