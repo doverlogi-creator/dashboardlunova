@@ -25,11 +25,12 @@ import {
   Moon,
   ChevronDown,
   ChevronRight,
-  Circle
+  Circle,
+  Hourglass
 } from "lucide-react";
 
 import { EventData, CostSettings, AppsScriptConfig, ProcurementItem } from "./types";
-import { MOCK_EVENTS, DEFAULT_SETTINGS, getDashboardTotals, formatRupiah, parseDate } from "./utils";
+import { MOCK_EVENTS, DEFAULT_SETTINGS, getDashboardTotals, getEventFinances, formatRupiah, parseDate } from "./utils";
 import { translations } from "./translations";
 import StatCard from "./components/StatCard";
 import Charts, { VendorPerformance } from "./components/Charts";
@@ -591,6 +592,31 @@ export default function App() {
   });
   const totals = getDashboardTotals(filteredEvents, settings);
   const totalSpending = procurements.reduce((sum, item) => sum + (item.harga * item.jumlah), 0);
+
+  // Calculate cashback stats for the dashboard card
+  const qualifyingEvents = filteredEvents.filter((evt) => {
+    const pkg = (evt.jenisPaket || "").trim().toLowerCase();
+    const isPresetPackage = pkg.startsWith("paket");
+    const hasCustomOverride = evt.cashback !== undefined;
+    return isPresetPackage || hasCustomOverride;
+  });
+
+  const sisaKasSetelahPengadaan = totals.totalKasShare + (settings.kasTambahan || 0) - totalSpending;
+  let totalAccumulatedCashback = 0;
+  let totalPaidCashback = 0;
+
+  qualifyingEvents.forEach((evt) => {
+    const fin = getEventFinances(evt, settings);
+    totalAccumulatedCashback += fin.eventCashback;
+    if (evt.cashbackDibayar) {
+      totalPaidCashback += fin.eventCashback;
+    }
+  });
+
+  const actualSaldo = settings.saldoRekeningRiil || 0;
+  const diffSaldo = actualSaldo - sisaKasSetelahPengadaan;
+  const sisaCashbackBaruForDashboard = totalAccumulatedCashback + diffSaldo - totalPaidCashback;
+
   const t = translations[lang];
 
   return (
@@ -984,14 +1010,18 @@ export default function App() {
               />
 
               <StatCard
-                id="kpi-profit"
-                title={t.kpiTotalNetProfit}
-                value={totals.totalCashback}
-                icon={<Coins className="w-5 h-5" />}
-                colorClass="text-purple-400"
-                description={t.kpiTotalNetProfitDesc}
-                badgeText={t.kpiRemainingProfit}
-                badgeColorClass="bg-purple-500/10 text-purple-400 border-purple-500/20"
+                id="cb-total-pending"
+                title={lang === "en" ? "Remaining Pending Balance" : "Sisa Cashback (Belum Bayar)"}
+                value={sisaCashbackBaruForDashboard}
+                icon={<Hourglass className="w-5 h-5 text-rose-450 animate-pulse" />}
+                colorClass="text-rose-450 font-semibold"
+                description={
+                  lang === "en" 
+                    ? "Awaiting cash or bank disbursement" 
+                    : "Menunggu pembayaran transfer bank / tunai"
+                }
+                badgeText={lang === "en" ? "Pending" : "Tertunda"}
+                badgeColorClass="bg-rose-500/10 text-rose-400 border-rose-500/20"
               />
 
               <StatCard
