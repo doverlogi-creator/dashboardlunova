@@ -257,11 +257,11 @@ export default function App() {
     }
   };
 
-  const handleAddProcurement = (item: Omit<ProcurementItem, "id">) => {
+  const handleAddProcurement = (item: Omit<ProcurementItem, "id"> & { id?: string }) => {
     const newProc: ProcurementItem = {
       ...item,
-      id: "proc-" + Date.now()
-    };
+      id: item.id || "proc-" + Date.now()
+    } as any;
     const updated = [...procurements, newProc];
     saveProcurementsLocally(updated);
   };
