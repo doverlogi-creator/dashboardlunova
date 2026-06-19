@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, ChangeEvent, FormEvent } from "react";
+import { useState, useEffect, ChangeEvent, FormEvent } from "react";
 import { ProcurementItem, CostSettings } from "../types";
 import { formatRupiah, formatDateIndo } from "../utils";
 import StatCard from "./StatCard";
@@ -104,6 +104,24 @@ export default function ProcurementManagement({
     localStorage.setItem("event_bank_mutations", JSON.stringify(newMutations));
   };
 
+  const totalSpendingVal = procurements.reduce((sum, item) => sum + (item.harga * item.jumlah), 0);
+  const serializedMutations = JSON.stringify(mutations);
+
+  useEffect(() => {
+    const parsedMutations = JSON.parse(serializedMutations);
+    const baseMutationsNet = parsedMutations.reduce((sum: number, item: any) => {
+      return item.tipe === "masuk" ? sum + item.nominal : sum - item.nominal;
+    }, 0);
+    const calculatedSaldo = Math.max(0, kasTambahan + totalKasShare + baseMutationsNet - totalSpendingVal);
+
+    if (settings.saldoRekeningRiil !== calculatedSaldo) {
+      onUpdateSettings({
+        ...settings,
+        saldoRekeningRiil: calculatedSaldo
+      });
+    }
+  }, [kasTambahan, totalKasShare, totalSpendingVal, serializedMutations, onUpdateSettings]);
+
   // Mutation Input states
   const [mutTanggal, setMutTanggal] = useState<string>(new Date().toISOString().substring(0, 10));
   const [mutKeterangan, setMutKeterangan] = useState<string>("");
@@ -127,15 +145,6 @@ export default function ProcurementManagement({
     const updated = [newMutation, ...mutations];
     saveMutations(updated);
 
-    const calculatedBalance = updated.reduce((sum, item) => {
-      return item.tipe === "masuk" ? sum + item.nominal : sum - item.nominal;
-    }, 0);
-
-    onUpdateSettings({
-      ...settings,
-      saldoRekeningRiil: Math.max(0, calculatedBalance)
-    });
-
     setMutKeterangan("");
     setMutNominal("");
   };
@@ -143,15 +152,6 @@ export default function ProcurementManagement({
   const handleDeleteMutation = (id: string) => {
     const updated = mutations.filter((m) => m.id !== id);
     saveMutations(updated);
-
-    const calculatedBalance = updated.reduce((sum, item) => {
-      return item.tipe === "masuk" ? sum + item.nominal : sum - item.nominal;
-    }, 0);
-
-    onUpdateSettings({
-      ...settings,
-      saldoRekeningRiil: Math.max(0, calculatedBalance)
-    });
   };
 
   const handleDeleteClick = (id: string) => {
@@ -172,6 +172,20 @@ export default function ProcurementManagement({
   const latestItem = procurements.length > 0 
     ? [...procurements].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())[0]
     : null;
+
+  // Dynamically map all procurements (belanja modal) to outflow mutations
+  const mappedProcurements = procurements.map((item) => ({
+    id: `proc-mut-${item.id}`,
+    tanggal: item.tanggal,
+    keterangan: lang === "en" 
+      ? `Procurement: ${item.namaBarang} (${item.jumlah} pcs)` 
+      : `Belanja Modal: ${item.namaBarang} (${item.jumlah} pcs)`,
+    tipe: "keluar" as const,
+    nominal: item.harga * item.jumlah,
+    isProcurement: true
+  }));
+
+  const allMutations = [...mutations, ...mappedProcurements];
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -262,20 +276,20 @@ export default function ProcurementManagement({
           badgeColorClass="bg-blue-500/10 text-blue-400 border-blue-500/20"
         />
 
-        {/* Metric 3: Latest Procurement */}
+        {/* Metric 3: Kas Usaha */}
         <StatCard
           id="proc-latest-item"
-          title={lang === "en" ? "Latest Procurement" : "Pembelian Terakhir"}
-          value={latestItem ? latestItem.namaBarang : "-"}
-          icon={<TrendingUp className="w-5 h-5" />}
-          colorClass="text-purple-400"
+          title={lang === "en" ? "Enterprise Kas (Organic)" : "Kas Usaha (Bagi Hasil)"}
+          value={totalKasShare}
+          icon={<Coins className="w-5 h-5" />}
+          colorClass="text-amber-400"
           description={
-            latestItem 
-              ? `${formatDateIndo(latestItem.tanggal, lang)} (${formatRupiah(latestItem.harga * latestItem.jumlah)})` 
-              : (lang === "en" ? "No record found" : "Belum ada riwayat")
+            lang === "en" 
+              ? "Pure allocated event earnings" 
+              : "Bagi hasil murni dari pendapatan acara"
           }
-          badgeText={lang === "en" ? "Latest" : "Terbaru"}
-          badgeColorClass="bg-purple-500/10 text-purple-400 border-purple-500/20"
+          badgeText={lang === "en" ? "Organic" : "Bagi Hasil"}
+          badgeColorClass="bg-amber-500/10 text-amber-400 border-amber-500/20"
         />
 
         {/* Metric 4: Saldo Rekening Riil */}
@@ -293,77 +307,26 @@ export default function ProcurementManagement({
                 {lang === "en" ? "Actual Bank Balance" : "Saldo Rekening Riil"}
               </span>
               
-              {isEditingSaldo ? (
-                <div className="flex items-center gap-2 mt-1 w-full" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-sm font-bold text-emerald-400 font-mono">Rp</span>
-                  <input
-                    type="text"
-                    value={tempSaldo}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/\D/g, "");
-                      const val = raw ? parseInt(raw, 10) : 0;
-                      setTempSaldo(val.toLocaleString("id-ID"));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveSaldo();
-                      if (e.key === "Escape") setIsEditingSaldo(false);
-                    }}
-                    className="bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-500 w-full font-mono text-right"
-                    placeholder="0"
-                    autoFocus
-                  />
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      onClick={handleSaveSaldo}
-                      className="p-1 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setIsEditingSaldo(false)}
-                      className="p-1 px-1.5 bg-zinc-850 hover:bg-zinc-850 text-zinc-400 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 group/edit mt-1">
-                  <h3 className="text-2xl font-bold tracking-tight font-mono text-emerald-400">
-                    {formatRupiah(settings.saldoRekeningRiil || 0)}
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setTempSaldo((settings.saldoRekeningRiil || 0).toString());
-                      setIsEditingSaldo(true);
-                    }}
-                    className="p-1 bg-zinc-950 border border-zinc-850 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 rounded-lg transition-all opacity-0 group-hover/edit:opacity-100 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
-                    title={lang === "en" ? "Input actual balance" : "Masukkan saldo riil rekening Anda"}
-                  >
-                    <Edit2 className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-            {!isEditingSaldo && (
-              <div 
-                className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-400 group-hover:text-emerald-400 group-hover:border-zinc-700 transition-all cursor-pointer shrink-0"
-                onClick={() => {
-                  setTempSaldo((settings.saldoRekeningRiil || 0).toString());
-                  setIsEditingSaldo(true);
-                }}
-              >
-                <Edit2 className="w-4 h-4" />
+              <div className="flex items-center gap-2 mt-1">
+                <h3 className="text-2xl font-bold tracking-tight font-mono text-emerald-400">
+                  {formatRupiah(settings.saldoRekeningRiil || 0)}
+                </h3>
               </div>
-            )}
+            </div>
+            
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shrink-0 hover:scale-105 transition-transform" title={lang === "en" ? "Auto-computed from entries" : "Dihitung otomatis dari riwayat"}>
+              <span className="text-[10px] font-bold uppercase tracking-wider font-mono">
+                {lang === "en" ? "Auto" : "Otomatis"}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-800/80">
-            <span className="text-xs text-zinc-400 truncate max-w-[70%]">
-              {lang === "en" ? "Actual bank account statement" : "Saldo fisik mutasi di rekening"}
+            <span className="text-[10px] text-zinc-400 truncate max-w-[70%]">
+              {lang === "en" ? "Manual Addition + Bank Ledger" : "Tambahan Manual + Catatan Rekening"}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-mono">
-              Ikhtisar
+              {lang === "en" ? "Synced" : "Sinkron"}
             </span>
           </div>
         </div>
@@ -848,7 +811,7 @@ export default function ProcurementManagement({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-850 text-zinc-300 font-sans">
-                    {mutations.length === 0 ? (
+                    {allMutations.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-8 text-center text-zinc-550 font-mono italic">
                           {lang === "en" 
@@ -858,9 +821,9 @@ export default function ProcurementManagement({
                         </td>
                       </tr>
                     ) : (
-                      mutations
+                      allMutations
                         .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())
-                        .map((mut) => {
+                        .map((mut: any) => {
                           const isDeposit = mut.tipe === "masuk";
                           return (
                             <tr key={mut.id} className="hover:bg-zinc-950/20 transition-colors">
@@ -885,14 +848,21 @@ export default function ProcurementManagement({
                                 {isDeposit ? "+":"-"}{formatRupiah(mut.nominal)}
                               </td>
                               <td className="py-3 px-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMutation(mut.id)}
-                                  className="p-1 px-1.5 border border-zinc-800 hover:border-red-900/40 hover:bg-red-950/30 text-zinc-500 hover:text-red-400 rounded-lg text-xs transition-all flex items-center justify-center mx-auto cursor-pointer"
-                                  title={lang === "en" ? "Delete mutation" : "Hapus catatan mutasi"}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {mut.isProcurement ? (
+                                  <span className="inline-flex items-center gap-1 text-[9px] text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20 font-bold">
+                                    <ShoppingBag className="w-3 h-3 text-cyan-400" />
+                                    <span>{lang === "en" ? "Asset" : "Aset"}</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMutation(mut.id)}
+                                    className="p-1 px-1.5 border border-zinc-800 hover:border-red-900/40 hover:bg-red-950/30 text-zinc-500 hover:text-red-400 rounded-lg text-xs transition-all flex items-center justify-center mx-auto cursor-pointer"
+                                    title={lang === "en" ? "Delete mutation" : "Hapus catatan mutasi"}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           );
