@@ -257,11 +257,11 @@ export default function App() {
     }
   };
 
-  const handleAddProcurement = (item: Omit<ProcurementItem, "id"> & { id?: string }) => {
+  const handleAddProcurement = (item: Omit<ProcurementItem, "id">) => {
     const newProc: ProcurementItem = {
       ...item,
-      id: item.id || "proc-" + Date.now()
-    } as any;
+      id: "proc-" + Date.now()
+    };
     const updated = [...procurements, newProc];
     saveProcurementsLocally(updated);
   };
@@ -1253,7 +1253,7 @@ export default function App() {
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 active:scale-95 disabled:opacity-50 text-blue-400 border border-zinc-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                      <span>{isSyncing ? "Menyelaras..." : "Gores Sinkron"}</span>
+                      <span>{isSyncing ? "Menyinkronkan..." : "Sinkronkan Sekarang"}</span>
                     </button>
                   )}
                   <button

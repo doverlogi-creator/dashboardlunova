@@ -360,7 +360,7 @@ function myFunction() {
                 : "border-transparent text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            3. Hubbard & Tes Koneksi
+            3. Hubungkan & Tes Koneksi
           </button>
         </div>
 
@@ -409,20 +409,20 @@ function myFunction() {
                   </p>
                 </li>
                 <li>
-                  <p className="font-medium text-zinc-205">Terapkan Sebagai Aplikasi Web (Deploy)</p>
+                  <p className="font-medium text-zinc-200">Terapkan Sebagai Aplikasi Web (Deploy)</p>
                   <p className="text-zinc-400 mt-0.5">
                     - Klik tombol <strong className="text-zinc-100">Terapkan (Deploy) &gt; Penerapan Baru (New Deployment)</strong>.<br />
                     - Pilih Jenis Penerapan: <strong className="text-zinc-100">Aplikasi Web (Web App)</strong>.<br />
                     - Deskripsi: <code>Dashboard Lighting 2026</code>.<br />
                     - Jalankan sebagai (Execute as): <strong className="text-blue-400">Saya (Email Anda)</strong>.<br />
-                    - Siapa yang memiliki akses (Who has access): <strong className="text-blue-405">Siapa saja (Anyone)</strong>.<br />
+                    - Siapa yang memiliki akses (Who has access): <strong className="text-blue-400">Siapa saja (Anyone)</strong>.<br />
                     - Klik <strong className="text-zinc-100">Terapkan / Deploy</strong>, setujui izin keamanan Google (klik Advanced &gt; Go to ... (unsafe) jika muncul).
                   </p>
                 </li>
                 <li>
                   <p className="font-medium text-zinc-200">Salin URL Aplikasi Web</p>
                   <p className="text-zinc-400 mt-0.5">
-                    Setelah berhasil dideploy, Google akan memberikan <strong className="text-blue-400 font-bold">URL Web App</strong> yang diakhiri dengan <code>/exec</code>. Salin URL tersebut dan buka tab <strong>"3. Hubbard & Tes Koneksi"</strong> di modal ini untuk mengaktifkannya!
+                    Setelah berhasil dideploy, Google akan memberikan <strong className="text-blue-400 font-bold">URL Web App</strong> yang diakhiri dengan <code>/exec</code>. Salin URL tersebut dan buka tab <strong>"3. Hubungkan & Tes Koneksi"</strong> di modal ini untuk mengaktifkannya!
                   </p>
                 </li>
               </ol>
@@ -449,12 +449,12 @@ function myFunction() {
                 </div>
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-805 hover:bg-zinc-700 active:scale-95 text-xs text-zinc-200 font-medium rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-xs text-zinc-200 font-medium rounded-lg border border-zinc-700 transition-all cursor-pointer font-sans"
                 >
                   {copied ? (
                     <>
-                      <Check className="w-4 h-4 text-blue-450" />
-                      <span className="text-blue-450">Tersalin!</span>
+                      <Check className="w-4 h-4 text-blue-400" />
+                      <span className="text-blue-400">Tersalin!</span>
                     </>
                   ) : (
                     <>
@@ -508,7 +508,7 @@ function myFunction() {
                   <button
                     onClick={handleTest}
                     disabled={testing}
-                    className="flex items-center gap-1.5 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-blue-450 border border-zinc-750 rounded-xl text-sm font-semibold transition-all cursor-pointer font-sans"
+                    className="flex items-center gap-1.5 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-blue-400 border border-zinc-750 rounded-xl text-sm font-semibold transition-all cursor-pointer font-sans"
                   >
                     <RefreshCw className={`w-4 h-4 ${testing ? "animate-spin" : ""}`} />
                     {testing ? "Menghubungkan..." : "Tes Koneksi"}
@@ -521,7 +521,7 @@ function myFunction() {
                   className={`p-4 rounded-xl border border-transparent text-sm flex items-start gap-2.5 ${
                     testResult.success
                       ? "bg-blue-950/20 border-blue-950 text-blue-300"
-                      : "bg-red-950/25 border-red-950 text-red-350"
+                      : "bg-red-950/25 border-red-950 text-red-400"
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full mt-1.5 ${testResult.success ? "bg-blue-400" : "bg-red-400"}`} />
